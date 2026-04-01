@@ -1,0 +1,33 @@
+{
+  "generated": "2026-04-01",
+  "ui-ux-pro-max": {
+    "invocation": "python3 skills/ui-ux-pro-max/scripts/search.py \"<industry> <keywords>\" [--design-system] [--domain style|landing|ux] [-p <project_name>]",
+    "input": "Industry keywords string, optional domain filter, optional project name",
+    "output": "Design system: color palette, typography, spacing, shadows, border-radius, visual style (50+ styles, 161 palettes, 57 font pairings). Supports 10 stacks: React, Next.js, Vue, Svelte, SwiftUI, React Native, Flutter, Tailwind, shadcn/ui, HTML/CSS",
+    "notes": "Use --design-system flag to get full design system. Use --domain landing for landing page patterns. Call scripts/design_system.py for full token output. Requires Python 3."
+  },
+  "page-cro": {
+    "invocation": "Read SKILL.md and apply CRO framework to scraped page content. No CLI — LLM-native skill.",
+    "input": "Page content (HTML/markdown), page type (homepage/landing/pricing), conversion goal, traffic source",
+    "output": "Analysis across 7 dimensions (value prop, headline, CTA, visual hierarchy, trust signals, objection handling, friction points). Each dimension: score 1-5 + problem + solution. Quick wins + high-impact changes + test ideas + copy alternatives.",
+    "notes": "Check for .agents/product-marketing-context.md first. Related: signup-flow-cro, form-cro, popup-cro, copywriting, ab-test-setup"
+  },
+  "seo-audit": {
+    "invocation": "Read SKILL.md and apply SEO audit framework to page HTML/metadata. No CLI — LLM-native skill.",
+    "input": "Page URL, HTML content, metadata. Optionally: Search Console data, current traffic, recent changes",
+    "output": "Technical SEO findings (crawlability, indexation, Core Web Vitals, mobile, HTTPS, URL structure) + On-page findings (title tags, meta descriptions, heading structure, content, images, internal links, keywords). Priority-ordered action plan with High/Medium/Low impact per issue.",
+    "notes": "web_fetch cannot detect JS-injected schema (use Rich Results Test for schema validation). Priority order: crawlability > technical > on-page > content > authority"
+  },
+  "copywriting": {
+    "invocation": "Read SKILL.md and apply copywriting framework to existing page text. No CLI — LLM-native skill.",
+    "input": "Page type, target audience, product/offer description, traffic source, existing copy",
+    "output": "Rewritten copy organized by section: headline + subheadline + CTA (above fold), social proof, problem/pain, solution/benefits, how it works, objection handling, final CTA. Includes 2-3 alternatives for headlines and CTAs with rationale. Meta title + meta description.",
+    "notes": "Principles: clarity > cleverness, benefits > features, specific > vague, customer language > company jargon. Use copy-editing skill after draft for polish."
+  },
+  "animate": {
+    "invocation": "Read SKILL.md and generate animation strategy for UI. Invokes /frontend-design as dependency. LLM-native skill.",
+    "input": "UI components/sections to animate, brand personality (playful/serious), performance budget, audience context",
+    "output": "Animation plan with 4 layers: (1) Hero moment — ONE signature animation, (2) Feedback layer — interactions needing acknowledgment, (3) Transition layer — state changes to smooth, (4) Delight layer — surprise moments. CSS/JS implementation specs with timing (100-800ms ranges) and easing curves.",
+    "notes": "CRITICAL: Always include prefers-reduced-motion. Avoid bounce/elastic easing. Only animate transform + opacity (GPU-accelerated). Exit animations = ~75% of enter duration. NEVER animate layout properties (width/height/top/left)."
+  }
+}

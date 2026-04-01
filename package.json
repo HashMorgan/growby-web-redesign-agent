@@ -1,0 +1,13 @@
+{
+  "name": "growby-web-redesign-agent",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "GrowBy Web Redesign Agent — automated UI/UX/SEO redesign engine",
+  "scripts": {
+    "analyze": "node scripts/orchestrator.js",
+    "scrape": "node scripts/scraper.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1"
+  }
+}
