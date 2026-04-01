@@ -1,0 +1,7 @@
+.env
+node_modules/
+outputs/
+memory/episodic/
+memory/working/
+.DS_Store
+*.log
