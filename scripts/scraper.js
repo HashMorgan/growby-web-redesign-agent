@@ -184,9 +184,18 @@ function extractAssets(html, baseUrl) {
 function extractBusinessData(markdown, html, metadata, url) {
   const text = markdown + ' ' + metadata.title + ' ' + metadata.description;
 
-  // Company name from title
-  const titleParts = (metadata.title || '').split(/[\|—\-·]/);
-  const companyName = (titleParts[0] || metadata.title || '').trim();
+  // Company name from title — skip generic WordPress/CMS fragments
+  const GENERIC_TITLES = ['uncategorized', 'home', 'inicio', 'blog', 'page', 'página', 'sin categoría', 'sin categoria', 'news', 'noticias', 'about', 'contact', 'contacto'];
+  const titleParts = (metadata.title || '').split(/[\|—–\-·]/);
+  const companyName = (
+    titleParts.find(p => {
+      const clean = p.trim().toLowerCase();
+      return clean.length > 2 && !GENERIC_TITLES.includes(clean);
+    }) ||
+    titleParts[0] ||
+    // fallback: extract from domain (e.g. grupotrianon.com → Grupotrianon)
+    (url.match(/(?:https?:\/\/)?(?:www\.)?([^./]+)/)?.[1] || 'Empresa')
+  ).trim();
 
   // Key services — look for lists of services/products
   const servicesSection = markdown.match(/(?:servicios|productos|soluciones|services|products)[:\s\n]+([\s\S]{0,1000})/i);
