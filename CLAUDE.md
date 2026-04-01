@@ -512,6 +512,63 @@ v1.1.0 — first-patterns
 
 ---
 
+## PROTOCOLO DE CIERRE DE SESIÓN
+
+**Activación:** Kevin escribe `cerrar sesión`.
+
+Al recibir esa señal, ejecutar estos pasos en orden antes de que Kevin cierre la terminal:
+
+### Paso 1 — Guardar estado en memoria
+
+Crear o actualizar `memory/working/sesion-[NNN]-[nombre].md` con:
+
+```markdown
+# Sesión [NNN] — [nombre descriptivo]
+Fecha: [YYYY-MM-DD]
+Duración estimada: [X minutos/horas]
+
+## Completado
+- [item 1]
+- [item 2]
+
+## Pendiente
+- [item 1]
+- [item 2]
+
+## Decisiones tomadas
+- [decisión]: [por qué]
+
+## Problemas encontrados
+- [problema]: [cómo se resolvió]
+
+## Estado del proyecto
+- Versión: [vX.Y.Z]
+- Rama git: [nombre]
+- Último commit: [hash corto] — [mensaje]
+- Next step: [acción concreta para la próxima sesión]
+```
+
+El número `[NNN]` es correlativo (001, 002, 003…). Revisar `memory/working/` para determinar el número correcto.
+
+### Paso 2 — Commit de checkpoint
+
+```bash
+git add .
+git commit -m "chore: session [NNN] checkpoint — [resumen en una línea]"
+git push
+```
+
+### Paso 3 — Mostrar resumen a Kevin
+
+```
+✅ Sesión [NNN] completada
+📁 Archivos modificados: [lista de archivos clave]
+🧠 Guardado en: memory/working/sesion-[NNN]-[nombre].md
+⏭️  Próximo paso: [acción concreta]
+```
+
+---
+
 ## Referencias
 
 - **Notion:** https://www.notion.so/3353cc981ba481509709c6d6930a8489
