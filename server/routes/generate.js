@@ -3,7 +3,7 @@ import { exec, execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import { broadcast, activeJobs } from '../app.js';
+import { broadcast, activeJobs } from '../lib/broadcast.js';
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

@@ -98,8 +98,8 @@ app.get('/web-redesign', requireAuth, (req, res) =>
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-export const activeConnections = new Map();
-export const activeJobs = new Map();
+import { activeConnections, broadcast, activeJobs } from './lib/broadcast.js';
+export { broadcast, activeJobs };
 
 wss.on('connection', (ws) => {
   const clientId = crypto.randomBytes(5).toString('hex');
@@ -113,13 +113,6 @@ wss.on('connection', (ws) => {
 
   ws.on('error', (err) => console.error('⚠️  WS error:', err.message));
 });
-
-export function broadcast(data) {
-  const message = JSON.stringify(data);
-  activeConnections.forEach((ws) => {
-    if (ws.readyState === ws.OPEN) ws.send(message);
-  });
-}
 
 // ── Protected API routes — Web Redesign Agent ────────────────────────────────
 import generateRoute from './routes/generate.js';

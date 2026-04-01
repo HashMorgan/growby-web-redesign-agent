@@ -3,9 +3,13 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import Anthropic from '@anthropic-ai/sdk';
-import { broadcast } from '../app.js';
+import { broadcast } from '../lib/broadcast.js';
 import { requireAuth } from '../middleware/auth.js';
+
+// ── Option B: re-run generator pipeline with feedback injected ──
+import { planLayout } from '../../scripts/agents/layout-architect.js';
+import { buildComponents } from '../../scripts/agents/component-builder.js';
+import { assembleHTML } from '../../scripts/agents/assembler.js';
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -27,9 +31,9 @@ router.post('/', requireAuth, async (req, res) => {
   res.json({ jobId, status: 'adjusting' });
 
   try {
-    broadcast({ jobId, step: 'adjusting', message: '🔧 Aplicando ajustes con IA...', progress: 20 });
+    broadcast({ jobId, step: 'adjusting', message: '🔧 Aplicando ajustes...', progress: 15 });
 
-    // Find latest HTML version
+    // Find latest HTML version to determine next version number
     const htmlFiles = fs.readdirSync(outputDir)
       .filter(f => f.match(/^index(-v\d+)?\.html$/))
       .sort((a, b) => {
@@ -39,24 +43,34 @@ router.post('/', requireAuth, async (req, res) => {
       });
 
     if (htmlFiles.length === 0) throw new Error('No se encontró index.html');
-
-    const latestHtmlPath = path.join(outputDir, htmlFiles[0]);
-    const currentHtml = fs.readFileSync(latestHtmlPath, 'utf8');
     const version = (parseInt(htmlFiles[0].match(/v(\d+)/)?.[1] || '1')) + 1;
 
-    broadcast({ jobId, step: 'adjusting', message: '🤖 Claude está modificando el diseño...', progress: 40 });
+    // Read analysis.json
+    const analysisPath = path.join(outputDir, 'analysis.json');
+    if (!fs.existsSync(analysisPath)) throw new Error('analysis.json no encontrado en output');
+    const analysis = JSON.parse(fs.readFileSync(analysisPath, 'utf8'));
 
-    let adjustedHtml;
+    broadcast({ jobId, step: 'adjusting', message: '📋 Analizando feedback...', progress: 25 });
 
+    let adjustedHtml, usedMethod;
+
+    // ── Option A: Claude API (if ANTHROPIC_API_KEY is set) ──────────────────
     if (process.env.ANTHROPIC_API_KEY) {
-      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      try {
+        broadcast({ jobId, step: 'adjusting', message: '🤖 Claude está modificando el diseño (API)...', progress: 40 });
 
-      const response = await client.messages.create({
-        model: 'claude-sonnet-4-5',
-        max_tokens: 8000,
-        messages: [{
-          role: 'user',
-          content: `Eres un experto en rediseño web. Tienes este HTML de un rediseño web y el siguiente feedback del cliente.
+        const { default: Anthropic } = await import('@anthropic-ai/sdk');
+        const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+        const latestHtmlPath = path.join(outputDir, htmlFiles[0]);
+        const currentHtml = fs.readFileSync(latestHtmlPath, 'utf8');
+
+        const response = await client.messages.create({
+          model: 'claude-sonnet-4-5',
+          max_tokens: 8000,
+          messages: [{
+            role: 'user',
+            content: `Eres un experto en rediseño web. Tienes este HTML de un rediseño web y el siguiente feedback del cliente.
 Modifica ÚNICAMENTE las secciones mencionadas en el feedback preservando todo el resto del código intacto.
 Devuelve SOLO el HTML completo modificado, sin explicaciones, sin markdown, sin bloques de código.
 
@@ -65,34 +79,80 @@ ${feedback}
 
 HTML ACTUAL:
 ${currentHtml.substring(0, 50000)}`
-        }]
-      });
+          }]
+        });
 
-      adjustedHtml = response.content[0].text;
+        const candidateHtml = response.content[0].text;
 
-      if (!adjustedHtml.includes('<!DOCTYPE') && !adjustedHtml.includes('<html')) {
-        throw new Error('Claude no devolvió HTML válido');
+        if (!candidateHtml.includes('<!DOCTYPE') && !candidateHtml.includes('<html')) {
+          throw new Error('Claude no devolvió HTML válido');
+        }
+
+        adjustedHtml = candidateHtml;
+        usedMethod = 'claude_api';
+      } catch (apiErr) {
+        console.warn(`  ⚠ Claude API falló: ${apiErr.message}. Usando pipeline re-run...`);
+        // Fall through to Option B
       }
-    } else {
-      // Fallback sin API key: registrar feedback como nota visible
-      const note = `\n<style>.feedback-note{position:fixed;bottom:16px;right:16px;background:#5D55D7;color:#fff;padding:12px 20px;border-radius:8px;font-size:0.875rem;max-width:300px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2)}</style>\n<div class="feedback-note">⚙️ Ajuste pendiente: ${feedback}</div>`;
-      adjustedHtml = currentHtml.replace('</body>', `${note}\n</body>`);
-      broadcast({ jobId, step: 'adjusting', message: '⚠️ Sin ANTHROPIC_API_KEY — feedback registrado como nota', progress: 60 });
     }
 
-    // Save new version
+    // ── Option B: Re-run generator pipeline with feedback injected ───────────
+    if (!adjustedHtml) {
+      broadcast({ jobId, step: 'adjusting', message: '🔄 Re-generando diseño con feedback...', progress: 40 });
+
+      // Inject feedback as adjustment instructions into the analysis
+      const analysisWithFeedback = {
+        ...analysis,
+        adjustment_feedback: feedback,
+        // Append feedback hint to copy analysis so layout/components can reference it
+        seo_copy_analysis: {
+          ...(analysis.seo_copy_analysis || {}),
+          adjustment_instructions: feedback,
+        },
+      };
+
+      broadcast({ jobId, step: 'adjusting', message: '📐 Recalculando layout...', progress: 55 });
+      const layoutPlan = planLayout(analysisWithFeedback);
+
+      broadcast({ jobId, step: 'adjusting', message: '🧱 Reconstruyendo componentes...', progress: 70 });
+      const components = buildComponents(layoutPlan, analysisWithFeedback);
+
+      broadcast({ jobId, step: 'adjusting', message: '🔗 Ensamblando HTML...', progress: 82 });
+      const newFilename = `index-v${version}.html`;
+      const { htmlPath } = await assembleHTML(
+        components,
+        layoutPlan,
+        analysisWithFeedback,
+        outputDir,
+        newFilename
+      );
+
+      adjustedHtml = fs.readFileSync(htmlPath, 'utf8');
+      usedMethod = 'pipeline_rerun';
+    }
+
+    // Save versioned file and overwrite index.html
     const newHtmlFile = `index-v${version}.html`;
     const newHtmlPath = path.join(outputDir, newHtmlFile);
-    fs.writeFileSync(newHtmlPath, adjustedHtml);
+    if (usedMethod === 'claude_api') {
+      // Option A wrote its own HTML — save it
+      fs.writeFileSync(newHtmlPath, adjustedHtml);
+    }
+    // Always keep index.html up to date
     fs.writeFileSync(path.join(outputDir, 'index.html'), adjustedHtml);
 
     // Log feedback
     const logPath = path.join(outputDir, 'feedback-log.json');
     const log = fs.existsSync(logPath) ? JSON.parse(fs.readFileSync(logPath, 'utf8')) : [];
-    log.push({ version, feedback, timestamp: new Date().toISOString(), model: process.env.ANTHROPIC_API_KEY ? 'claude-sonnet-4-5' : 'none' });
+    log.push({
+      version,
+      feedback,
+      timestamp: new Date().toISOString(),
+      method: usedMethod,
+    });
     fs.writeFileSync(logPath, JSON.stringify(log, null, 2));
 
-    broadcast({ jobId, step: 'adjusting', message: '🚀 Publicando versión ajustada en Netlify...', progress: 75 });
+    broadcast({ jobId, step: 'adjusting', message: '🚀 Publicando versión ajustada en Netlify...', progress: 88 });
 
     // Re-deploy to Netlify
     let netlifyUrl = `/preview/${jobId}/index.html`;
@@ -110,7 +170,14 @@ ${currentHtml.substring(0, 50000)}`
       }
     }
 
-    broadcast({ jobId, step: 'adjusted', message: `✅ Versión ${version} lista`, progress: 100, netlifyUrl, version });
+    broadcast({
+      jobId,
+      step: 'adjusted',
+      message: `✅ Versión ${version} lista (método: ${usedMethod})`,
+      progress: 100,
+      netlifyUrl,
+      version,
+    });
 
   } catch (err) {
     console.error('Error en adjust:', err.message);
