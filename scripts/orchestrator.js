@@ -84,18 +84,37 @@ export async function run(url) {
   console.log(`  ✅ FAQ items: ${(scrapingData.faq || []).length}`);
   console.log(`  ✅ Logos de clientes: ${scrapingData.assets?.client_logos?.length || 0}`);
 
+  // ── Token counter ───────────────────────────────────────────────────��──────
+  const tokenEstimate = (obj) => Math.ceil(JSON.stringify(obj).length / 4);
+  console.log(`\n📊 Tokens estimados — ANTES del slicing:`);
+  console.log(`   Scraping output completo: ${tokenEstimate(scrapingData)} tokens`);
+
   // ═══════════════════════════════════════════════════════
-  // FASE 2: ANÁLISIS (4 agentes en paralelo)
+  // FASE 2: ANÁLISIS (4 agentes con slices mínimos)
   // ═══════════════════════════════════════════════════════
   console.log('\n━━━ FASE 2: ANÁLISIS (4 agentes en paralelo) ━━━━━━━');
 
+  // Each agent receives only its relevant data slice — 70%+ token reduction
+  // markdown fallback for old scraper format (no content field)
+  const markdownFallback = scrapingData.content?.text_preview || (typeof scrapingData.markdown === 'string' ? scrapingData.markdown.slice(0, 2000) : '');
+  const uiSlice  = { brand: scrapingData.brand, business: { industry }, assets: scrapingData.assets, metadata: scrapingData.metadata };
+  const uxSlice  = { business: scrapingData.business, content: scrapingData.content, metadata: scrapingData.metadata, url, markdown: markdownFallback };
+  const seoSlice = { content: scrapingData.content, meta: scrapingData.metadata, metadata: scrapingData.metadata, business: scrapingData.business, url, markdown: markdownFallback };
+  const visSlice = { assets: scrapingData.assets, brand: scrapingData.brand, business: { industry } };
+
+  console.log(`📊 Tokens estimados — DESPUÉS del slicing:`);
+  console.log(`   ui-agent slice:       ${tokenEstimate(uiSlice)} tokens`);
+  console.log(`   ux-agent slice:       ${tokenEstimate(uxSlice)} tokens`);
+  console.log(`   seo-agent slice:      ${tokenEstimate(seoSlice)} tokens`);
+  console.log(`   visual-agent slice:   ${tokenEstimate(visSlice)} tokens`);
+
   const [uiResult, uxResult, seoCopyResult] = await Promise.all([
-    Promise.resolve(runUIAgent(scrapingData)),
-    Promise.resolve(runUXAgent(scrapingData, null)),
-    Promise.resolve(runSEOCopyAgent(scrapingData, industry)),
+    Promise.resolve(runUIAgent(uiSlice)),
+    Promise.resolve(runUXAgent(uxSlice, null)),
+    Promise.resolve(runSEOCopyAgent(seoSlice, industry)),
   ]);
 
-  const visualResultFinal = runVisualAgent(scrapingData, uiResult);
+  const visualResultFinal = runVisualAgent(visSlice, uiResult);
   console.log('✓ 4 agentes de análisis completados');
 
   // Combine all analysis results
@@ -105,7 +124,7 @@ export async function run(url) {
       url,
       timestamp,
       industria: industry,
-      agent_version: 'v0.9.0',
+      agent_version: 'v0.9.2',
     },
     scraping: {
       source: scrapingData.source,
@@ -115,6 +134,7 @@ export async function run(url) {
       assets: scrapingData.assets || null,
       brand: scrapingData.brand || null,
       business: scrapingData.business || null,
+      content: scrapingData.content || null,
       pages_scraped: scrapingData.pages_scraped || 1,
       metadata: scrapingData.metadata || {},
     },
@@ -122,11 +142,12 @@ export async function run(url) {
     ux_analysis: uxResult,
     seo_copy_analysis: seoCopyResult,
     visual_analysis: visualResultFinal,
-    // Enhanced fields from scraper-pro
     testimonials: scrapingData.testimonials || scrapingData.business?.testimonials || [],
     faq: scrapingData.faq || [],
     navigation_pages: scrapingData.navigation_pages || ['/'],
   };
+
+  console.log(`\n📊 Tokens estimados — analysis.json final: ${tokenEstimate(fullAnalysis)} tokens`);
 
   // Save analysis
   ensureDir(path.join(PROJECT_ROOT, 'memory', 'working'));
@@ -171,6 +192,7 @@ export async function run(url) {
     outputDir
   );
   console.log(`✓ HTML assembleado: index.html (${(htmlSize / 1024).toFixed(1)} KB)`);
+  console.log(`📊 Tokens estimados — HTML final: ${Math.ceil(htmlSize / 4)} tokens`);
 
   // ═══════════════════════════════════════════════════════
   // FASE 6: DEPLOY A NETLIFY

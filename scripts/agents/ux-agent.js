@@ -133,8 +133,13 @@ function scoreFriction(markdown, url) {
   };
 }
 
-export function runUXAgent(scrapingData, uiData) {
-  const { markdown, metadata, url, industria_detectada } = scrapingData;
+// Accepts either full scrapingData or { business, content, metadata, url } slice
+export function runUXAgent(slice, uiData) {
+  // Support both full scrapingData object and new slice format
+  const markdown = slice.content?.text_preview || slice.markdown || '';
+  const metadata = slice.metadata || {};
+  const url = slice.url || '';
+  const industria_detectada = slice.business?.industry || slice.industria_detectada || 'general';
 
   console.log('  📊 [UX Agent] Analizando 7 dimensiones CRO...');
 

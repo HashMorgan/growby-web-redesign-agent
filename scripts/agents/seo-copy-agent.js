@@ -230,8 +230,18 @@ function rewriteCopy(scrapingData, industry) {
   };
 }
 
-export function runSEOCopyAgent(scrapingData, industry) {
-  const { markdown, metadata, url } = scrapingData;
+// Accepts either full scrapingData or { content, meta, metadata, business, url } slice
+export function runSEOCopyAgent(slice, industry) {
+  // Build backward-compat scrapingData with normalized markdown field
+  const scrapingData = {
+    ...slice,
+    markdown: slice.content?.text_preview || slice.markdown || '',
+  };
+  // Support both full scrapingData and new slice format
+  const markdown = scrapingData.markdown;
+  const metadata = slice.metadata || slice.meta || {};
+  const url = slice.url || '';
+  if (!industry) industry = slice.business?.industry || slice.industria_detectada || 'general';
 
   console.log('  🔍 [SEO/Copy Agent] Auditando SEO + reescribiendo copy...');
 
