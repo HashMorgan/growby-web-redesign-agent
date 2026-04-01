@@ -9,16 +9,76 @@ const PROJECT_ROOT = path.join(__dirname, '..');
 
 function ensureDir(d) { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); }
 
+// ─── REGLA 2: Inferir colores de marca desde assets ──────────────────────────
+// Filtra colores que son blancos/negros/grises para quedarse con los de marca
+function inferBrandColors(assets) {
+  if (!assets?.colors?.length) return null;
+
+  const isGrayish = (hex) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const saturation = max === 0 ? 0 : (max - min) / max;
+    return saturation < 0.15; // very gray/neutral
+  };
+
+  const isVeryLight = (hex) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return (r + g + b) / 3 > 230;
+  };
+
+  // Prefer non-gray, non-white colors from assets
+  const brandColors = assets.colors
+    .filter(c => c && c.startsWith('#') && c.length === 7)
+    .filter(c => !isGrayish(c) && !isVeryLight(c));
+
+  if (!brandColors.length) return null;
+
+  return {
+    primary: brandColors[0] || null,
+    secondary: brandColors[1] || null,
+    accent: brandColors[2] || null,
+  };
+}
+
 // Map analysis design_system → template-compatible DS format
-function mapDesignSystem(ds) {
+// REGLA 2: Brand colors from assets OVERRIDE the AI-generated design system
+function mapDesignSystem(ds, assets) {
   const p = ds.palette || {};
   const t = ds.typography || {};
   const br = ds.border_radius || {};
+
+  // Start with AI design system defaults
+  let primary   = p.primary    || '#7c3aed';
+  let secondary = p.secondary  || '#0891b2';
+  let accent    = p.accent     || '#f59e0b';
+
+  // REGLA 2: Override with real brand colors if detected
+  const brandColors = inferBrandColors(assets);
+  if (brandColors) {
+    if (brandColors.primary)   primary   = brandColors.primary;
+    if (brandColors.secondary) secondary = brandColors.secondary;
+    if (brandColors.accent)    accent    = brandColors.accent || accent;
+  }
+
+  // REGLA 3: Override fonts if detected from real site
+  let headingFont = t.heading_font || 'Sora';
+  let bodyFont    = t.body_font    || 'Inter';
+  if (assets?.fonts?.length > 0) {
+    // Use first detected font as heading, second as body
+    headingFont = assets.fonts[0] || headingFont;
+    bodyFont    = assets.fonts[1] || assets.fonts[0] || bodyFont;
+  }
+
   return {
     colors: {
-      primary:    p.primary    || '#7c3aed',
-      secondary:  p.secondary  || '#0891b2',
-      accent:     p.accent     || '#f59e0b',
+      primary,
+      secondary,
+      accent,
       neutral:    p.neutral_light || '#f4f4f5',
       dark:       p.neutral_dark  || '#18181b',
       mid:        p.neutral_mid   || '#52525b',
@@ -27,8 +87,8 @@ function mapDesignSystem(ds) {
       success:    p.success      || '#22c55e',
     },
     fonts: {
-      heading: t.heading_font || 'Sora',
-      body:    t.body_font    || 'Inter',
+      heading: headingFont,
+      body:    bodyFont,
     },
     borderRadius: br.md || '12px',
     borderRadiusSm: br.sm || '6px',
@@ -39,66 +99,34 @@ function mapDesignSystem(ds) {
   };
 }
 
-// GrowBy-specific features based on analysis
+// REGLA 4: Get best available image for a section
+// Priority: 1) real site image, 2) Gemini generated, 3) null (gradient)
+function pickImage(siteImages, geminiImages, key, siteIndex = 0) {
+  // Try Gemini first if available (higher quality)
+  if (geminiImages[key]) return { src: `data:image/jpeg;base64,${geminiImages[key]}`, type: 'gemini' };
+  // Fall back to real site image
+  if (siteImages && siteImages[siteIndex]) return { src: siteImages[siteIndex], type: 'real' };
+  return null;
+}
+
+// GrowBy features based on analysis
 function buildGrowByFeatures(analysis) {
   const copy = analysis.seo_copy_analysis?.rewritten_copy;
   return [
-    {
-      icon: '🚀',
-      title: 'Proyectos Projects',
-      description: 'Desarrollo de software, UX/UI, ecommerce e IA. Construimos soluciones a medida con el mejor talento de LatAm.',
-    },
-    {
-      icon: '🎯',
-      title: 'Hiring & Staffing',
-      description: 'Hunting TI, staff augmentation y outsourcing. Encontramos el talento que necesitas, cuando lo necesitas.',
-    },
-    {
-      icon: '🤖',
-      title: 'GrowBy AI',
-      description: 'IA conversacional, generativa y low-code. Automatizamos procesos y creamos experiencias inteligentes.',
-    },
-    {
-      icon: '📊',
-      title: 'Resultados medibles',
-      description: 'Más de 250 proyectos entregados. Trabajamos con métricas claras y entregamos resultados concretos desde el primer sprint.',
-    },
-    {
-      icon: '🌎',
-      title: 'Talento LatAm',
-      description: 'Red de +100,000 especialistas digitales en toda Latinoamérica. Talento de primer nivel, a costos competitivos.',
-    },
-    {
-      icon: '⚡',
-      title: 'Entrega rápida',
-      description: 'Primeros resultados en semanas, no meses. Metodología ágil con sprints de 2 semanas y demos continuas.',
-    },
+    { icon: '🚀', title: 'GrowBy Projects', description: 'Desarrollo de software, UX/UI, ecommerce e IA. Construimos soluciones a medida con el mejor talento de LatAm.' },
+    { icon: '🎯', title: 'Hiring & Staffing', description: 'Hunting TI, staff augmentation y outsourcing. Encontramos el talento que necesitas, cuando lo necesitas.' },
+    { icon: '🤖', title: 'GrowBy AI', description: 'IA conversacional, generativa y low-code. Automatizamos procesos y creamos experiencias inteligentes.' },
+    { icon: '📊', title: 'Resultados medibles', description: 'Más de 250 proyectos entregados. Trabajamos con métricas claras y entregamos resultados concretos desde el primer sprint.' },
+    { icon: '🌎', title: 'Talento LatAm', description: 'Red de +100,000 especialistas digitales en toda Latinoamérica. Talento de primer nivel, a costos competitivos.' },
+    { icon: '⚡', title: 'Entrega rápida', description: 'Primeros resultados en semanas, no meses. Metodología ágil con sprints de 2 semanas y demos continuas.' },
   ];
 }
 
 function buildTestimonials() {
   return [
-    {
-      name: 'María González',
-      role: 'Directora de Tecnología',
-      company: 'Cencosud',
-      text: 'GrowBy entendió nuestros requerimientos desde el primer día. Entregaron el proyecto en tiempo récord con una calidad técnica excepcional.',
-      rating: 5,
-    },
-    {
-      name: 'Carlos Herrera',
-      role: 'CEO',
-      company: 'Sodexo LatAm',
-      text: 'El staff augmentation con GrowBy nos permitió escalar nuestro equipo de 5 a 20 desarrolladores en solo 3 semanas. Increíble.',
-      rating: 5,
-    },
-    {
-      name: 'Ana Ramírez',
-      role: 'VP de Producto',
-      company: 'MAPFRE',
-      text: 'Transformaron nuestro proceso de claims digitales con IA. Redujimos el tiempo de atención de 72h a menos de 6h.',
-      rating: 5,
-    },
+    { name: 'María González', role: 'Directora de Tecnología', company: 'Cencosud', text: 'GrowBy entendió nuestros requerimientos desde el primer día. Entregaron el proyecto en tiempo récord con una calidad técnica excepcional.', rating: 5 },
+    { name: 'Carlos Herrera', role: 'CEO', company: 'Sodexo LatAm', text: 'El staff augmentation con GrowBy nos permitió escalar nuestro equipo de 5 a 20 desarrolladores en solo 3 semanas. Increíble.', rating: 5 },
+    { name: 'Ana Ramírez', role: 'VP de Producto', company: 'MAPFRE', text: 'Transformaron nuestro proceso de claims digitales con IA. Redujimos el tiempo de atención de 72h a menos de 6h.', rating: 5 },
   ];
 }
 
@@ -112,7 +140,7 @@ function buildFAQ() {
 }
 
 // Build the complete JSX component as a string
-function buildJSXComponent(analysis, images, ds) {
+function buildJSXComponent(analysis, geminiImages, ds, assets) {
   const copy = analysis.seo_copy_analysis?.rewritten_copy || {};
   const features = buildGrowByFeatures(analysis);
   const testimonials = buildTestimonials();
@@ -121,17 +149,38 @@ function buildJSXComponent(analysis, images, ds) {
   const fonts = ds.fonts;
   const br = ds.borderRadius;
 
-  const imgToSrc = (key) => images[key]
-    ? `data:image/jpeg;base64,${images[key]}`
+  // REGLA 1: Real logo URL from scraped assets
+  const logoUrl = assets?.logo_url || null;
+  const logoImgTag = logoUrl
+    ? `<img src="${logoUrl}" alt="${analysis.meta?.company_name || 'Logo'}" style={{ height: '40px', width: 'auto', objectFit: 'contain' }} />`
     : null;
 
-  const heroImg   = imgToSrc('hero_image');
-  const ctaBg     = imgToSrc('cta_bg');
+  // REGLA 4: Best available images for each section
+  const siteImages = assets?.images || [];
+  const heroImageData   = pickImage(siteImages, geminiImages, 'hero_image', 0);
+  const ctaImageData    = pickImage(siteImages, geminiImages, 'cta_bg', 1);
 
-  // Inline styles as JS objects to avoid template literal escaping issues
+  const heroImgStyle = heroImageData
+    ? `\`linear-gradient(135deg, rgba(${hexToRgb(colors.primary)},0.88) 0%, rgba(${hexToRgb(colors.secondary)},0.82) 100%), url(${heroImageData.src}) center/cover no-repeat\``
+    : `\`linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 60%, #05647a 100%)\``;
+
+  const ctaBgStyle = ctaImageData
+    ? `\`linear-gradient(135deg, rgba(${hexToRgb(colors.primary)},0.9), rgba(${hexToRgb(colors.secondary)},0.85)), url(${ctaImageData.src}) center/cover no-repeat\``
+    : `\`linear-gradient(135deg, \${DS.primary} 0%, \${DS.secondary} 100%)\``;
+
+  // REGLA 5: Client logos carousel data
+  const clientLogoUrls = assets?.client_logos || [];
+  const hasRealClientLogos = clientLogoUrls.length >= 3;
+  const clientLogoNamesDefault = ['Cencosud', 'Sodexo', 'MAPFRE', 'Gloria', 'ENEL', 'San Fernando', 'Los Portales', 'USIL', 'ASBANC', 'Ferreyros'];
+
+  const clientLogosData = hasRealClientLogos
+    ? JSON.stringify(clientLogoUrls)
+    : JSON.stringify(clientLogoNamesDefault);
+
   return `
-// ─── GrowBy Redesign — generated by GrowBy Web Redesign Agent v0.3.0 ───────
-// Design system: ${ds.colors.primary} · ${ds.fonts.heading} + ${ds.fonts.body}
+// ─── GrowBy Redesign — generated by GrowBy Web Redesign Agent v0.3.1 ───────
+// REGLA 2 — Brand colors: ${colors.primary} · REGLA 3 — Fonts: ${fonts.heading} + ${fonts.body}
+// REGLA 1 — Logo: ${logoUrl ? 'real ✅' : 'fallback text'} · REGLA 5 — Client logos: ${hasRealClientLogos ? 'real ✅' : 'text names'}
 
 const DS = {
   primary:   '${colors.primary}',
@@ -178,7 +227,7 @@ function FadeIn({ children, delay = 0, className = '' }) {
   );
 }
 
-// ─── HEADER / NAV ────────────────────────────────────────────────────────────
+// ─── HEADER / NAV ─── REGLA 1: Logo real del sitio ───────────────────────────
 function Header() {
   const [scrolled, setScrolled] = React.useState(false);
   React.useEffect(() => {
@@ -199,13 +248,13 @@ function Header() {
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     height: '72px' }}>
         <a href="#" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
-          <span style={{ width: 36, height: 36, borderRadius: DS.brSm,
-                         background: \`linear-gradient(135deg, \${DS.primary}, \${DS.secondary})\`,
+          ${logoImgTag || `<span style={{ width: 36, height: 36, borderRadius: DS.brSm,
+                         background: \\\`linear-gradient(135deg, \\\${DS.primary}, \\\${DS.secondary})\\\`,
                          display: 'flex', alignItems: 'center', justifyContent: 'center',
                          color: '#fff', fontWeight: 800, fontSize: '1rem',
-                         fontFamily: DS.headingFont }}>G</span>
-          <span style={{ fontFamily: DS.headingFont, fontWeight: 700, fontSize: '1.2rem',
-                         color: scrolled ? DS.dark : '#fff' }}>GrowBy</span>
+                         fontFamily: DS.headingFont }}>G</span>`}
+          ${logoImgTag ? '' : `<span style={{ fontFamily: DS.headingFont, fontWeight: 700, fontSize: '1.2rem',
+                         color: scrolled ? DS.dark : '#fff' }}>GrowBy</span>`}
         </a>
         <nav style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
           {['Servicios', 'Proyectos', 'Equipo', 'Blog'].map(item => (
@@ -219,39 +268,35 @@ function Header() {
               {item}
             </a>
           ))}
+          <a href="#contacto" style={{
+            padding: '10px 24px', borderRadius: DS.brFull,
+            background: DS.primary, color: '#fff',
+            fontFamily: DS.bodyFont, fontWeight: 600, fontSize: '0.875rem',
+            textDecoration: 'none', transition: 'transform 0.15s, box-shadow 0.15s',
+            boxShadow: \`0 4px 16px \${DS.primary}44\`,
+          }}
+            onMouseEnter={e => { e.target.style.transform = 'scale(1.04)'; e.target.style.boxShadow = \`0 8px 24px \${DS.primary}55\`; }}
+            onMouseLeave={e => { e.target.style.transform = 'scale(1)'; e.target.style.boxShadow = \`0 4px 16px \${DS.primary}44\`; }}>
+            Cuéntanos tu proyecto
+          </a>
         </nav>
-        <a href="#contacto" style={{
-          padding: '10px 24px', borderRadius: DS.brFull,
-          background: DS.primary, color: '#fff',
-          fontFamily: DS.bodyFont, fontWeight: 600, fontSize: '0.875rem',
-          textDecoration: 'none', transition: 'transform 0.15s, box-shadow 0.15s',
-          boxShadow: \`0 4px 16px \${DS.primary}44\`,
-        }}
-          onMouseEnter={e => { e.target.style.transform = 'scale(1.04)'; e.target.style.boxShadow = \`0 8px 24px \${DS.primary}55\`; }}
-          onMouseLeave={e => { e.target.style.transform = 'scale(1)'; e.target.style.boxShadow = \`0 4px 16px \${DS.primary}44\`; }}>
-          Cuéntanos tu proyecto
-        </a>
       </div>
     </header>
   );
 }
 
-// ─── HERO SECTION ────────────────────────────────────────────────────────────
+// ─── HERO SECTION ─── REGLA 4: Imagen real del sitio como fondo ──────────────
 function HeroSection() {
   const heroStyle = {
     minHeight: '100vh',
     display: 'flex', alignItems: 'center',
     position: 'relative', overflow: 'hidden',
-    background: ${heroImg
-      ? `\`linear-gradient(135deg, rgba(124,58,237,0.92) 0%, rgba(8,145,178,0.85) 100%), url(${heroImg}) center/cover no-repeat\``
-      : `\`linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 60%, #05647a 100%)\``
-    },
+    background: ${heroImgStyle},
     fontFamily: DS.bodyFont,
   };
 
   return (
     <section style={heroStyle}>
-      {/* Decorative blobs */}
       <div style={{ position: 'absolute', top: '-15%', right: '-10%', width: '600px', height: '600px',
                     borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', bottom: '-20%', left: '-5%', width: '400px', height: '400px',
@@ -260,7 +305,6 @@ function HeroSection() {
       <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '100px 24px 80px',
                     display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '64px',
                     alignItems: 'center' }}>
-        {/* Left: Copy */}
         <div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px',
                         background: 'rgba(255,255,255,0.12)', borderRadius: DS.brFull,
@@ -312,7 +356,6 @@ function HeroSection() {
           </p>
         </div>
 
-        {/* Right: Stats grid */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', animation: 'fadeInUp 0.8s ease 0.25s both' }}>
           {[
             { number: '250+', label: 'Proyectos entregados' },
@@ -343,37 +386,52 @@ function HeroSection() {
   );
 }
 
-// ─── CLIENT LOGOS ────────────────────────────────────────────────────────────
+// ─── CLIENT LOGOS ─── REGLA 5: Carrusel infinito CSS animation ───────────────
 function ClientLogos() {
-  const clients = [
-    'Cencosud', 'Sodexo', 'MAPFRE', 'Gloria', 'ENEL',
-    'San Fernando', 'Los Portales', 'USIL', 'ASBANC', 'Ferreyros',
-  ];
+  const hasRealLogos = ${hasRealClientLogos};
+  const items = ${clientLogosData};
+
+  // Duplicate items for seamless loop
+  const allItems = [...items, ...items];
 
   return (
-    <section style={{ background: DS.surface, padding: '48px 24px', overflow: 'hidden' }}>
+    <section style={{ background: DS.surface, padding: '48px 0', overflow: 'hidden' }}>
       <FadeIn>
         <p style={{ textAlign: 'center', fontFamily: DS.bodyFont, fontSize: '0.85rem',
                     fontWeight: 600, color: DS.mid, textTransform: 'uppercase',
-                    letterSpacing: '0.1em', marginBottom: '32px' }}>
+                    letterSpacing: '0.1em', marginBottom: '32px', padding: '0 24px' }}>
           Empresas líderes que confían en GrowBy
         </p>
       </FadeIn>
-      <div style={{ display: 'flex', gap: '48px', flexWrap: 'wrap',
-                    justifyContent: 'center', alignItems: 'center' }}>
-        {clients.map((client, i) => (
-          <FadeIn key={client} delay={i * 60}>
-            <span style={{
-              fontFamily: DS.headingFont, fontWeight: 700, fontSize: '1rem',
-              color: DS.mid, opacity: 0.65, letterSpacing: '-0.01em',
-              transition: 'opacity 0.2s, color 0.2s', cursor: 'default',
-            }}
-              onMouseEnter={e => { e.target.style.opacity = '1'; e.target.style.color = DS.primary; }}
-              onMouseLeave={e => { e.target.style.opacity = '0.65'; e.target.style.color = DS.mid; }}>
-              {client}
-            </span>
-          </FadeIn>
-        ))}
+      <div style={{ overflow: 'hidden', position: 'relative' }}>
+        <div style={{
+          display: 'flex',
+          gap: hasRealLogos ? '48px' : '64px',
+          animation: 'logoScroll 30s linear infinite',
+          width: 'max-content',
+          alignItems: 'center',
+        }}>
+          {allItems.map((item, i) => (
+            hasRealLogos
+              ? <img key={i} src={item} alt="client logo"
+                  style={{ height: '40px', width: 'auto', objectFit: 'contain',
+                           opacity: 0.6, filter: 'grayscale(100%)',
+                           transition: 'opacity 0.2s, filter 0.2s', flexShrink: 0 }}
+                  onMouseEnter={e => { e.target.style.opacity = '1'; e.target.style.filter = 'grayscale(0%)'; }}
+                  onMouseLeave={e => { e.target.style.opacity = '0.6'; e.target.style.filter = 'grayscale(100%)'; }}
+                />
+              : <span key={i} style={{
+                  fontFamily: DS.headingFont, fontWeight: 700, fontSize: '1rem',
+                  color: DS.mid, opacity: 0.55, letterSpacing: '-0.01em',
+                  whiteSpace: 'nowrap', flexShrink: 0,
+                  transition: 'opacity 0.2s, color 0.2s',
+                }}
+                  onMouseEnter={e => { e.target.style.opacity = '1'; e.target.style.color = DS.primary; }}
+                  onMouseLeave={e => { e.target.style.opacity = '0.55'; e.target.style.color = DS.mid; }}>
+                  {item}
+                </span>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -407,7 +465,7 @@ function FeaturesSection() {
                 boxShadow: '0 2px 16px rgba(0,0,0,0.05)',
                 transition: 'transform 0.25s ease, box-shadow 0.25s ease',
               }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(124,58,237,0.12)'; }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = \`0 12px 40px \${DS.primary}18\`; }}
                 onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 16px rgba(0,0,0,0.05)'; }}>
                 <div style={{ width: '56px', height: '56px', borderRadius: DS.br,
                               background: \`\${DS.primary}15\`, display: 'flex',
@@ -573,17 +631,14 @@ function FAQSection() {
   );
 }
 
-// ─── CTA FINAL ───────────────────────────────────────────────────────────────
+// ─── CTA FINAL ─── REGLA 4: Imagen real de fondo ─────────────────────────────
 function CTASection() {
   const ctaStyle = {
     padding: '112px 24px',
     textAlign: 'center',
     position: 'relative',
     overflow: 'hidden',
-    background: ${ctaBg
-      ? `\`linear-gradient(135deg, rgba(124,58,237,0.9), rgba(8,145,178,0.85)), url(${ctaBg}) center/cover no-repeat\``
-      : `\`linear-gradient(135deg, \${DS.primary} 0%, \${DS.secondary} 100%)\``
-    },
+    background: ${ctaBgStyle},
   };
 
   return (
@@ -620,7 +675,7 @@ function CTASection() {
   );
 }
 
-// ─── FOOTER ──────────────────────────────────────────────────────────────────
+// ─── FOOTER ─── REGLA 1: Logo real del sitio ─────────────────────────────────
 function Footer() {
   return (
     <footer style={{ background: DS.dark, padding: '64px 24px 32px', fontFamily: DS.bodyFont }}>
@@ -629,12 +684,15 @@ function Footer() {
                       gap: '48px', marginBottom: '48px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-              <span style={{ width: 36, height: 36, borderRadius: DS.brSm,
-                             background: \`linear-gradient(135deg, \${DS.primary}, \${DS.secondary})\`,
+              ${logoUrl
+                ? `<img src="${logoUrl}" alt="GrowBy" style={{ height: '36px', width: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />`
+                : `<span style={{ width: 36, height: 36, borderRadius: DS.brSm,
+                             background: \\\`linear-gradient(135deg, \\\${DS.primary}, \\\${DS.secondary})\\\`,
                              display: 'flex', alignItems: 'center', justifyContent: 'center',
                              color: '#fff', fontWeight: 800, fontSize: '1rem',
                              fontFamily: DS.headingFont }}>G</span>
-              <span style={{ fontFamily: DS.headingFont, fontWeight: 700, fontSize: '1.2rem', color: '#fff' }}>GrowBy</span>
+              <span style={{ fontFamily: DS.headingFont, fontWeight: 700, fontSize: '1.2rem', color: '#fff' }}>GrowBy</span>`
+              }
             </div>
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.875rem', lineHeight: 1.7 }}>
               Hub de especialistas digitales. Fundado en Lima, Perú. Operamos en toda LatAm y USA.
@@ -668,7 +726,7 @@ function Footer() {
             © 2026 Hub Negocios Creativos SAC · GrowBy · Lima, Perú
           </p>
           <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.75rem' }}>
-            Rediseño generado por GrowBy Web Redesign Agent v0.3.0
+            Rediseño generado por GrowBy Web Redesign Agent v0.3.1
           </p>
         </div>
       </div>
@@ -695,14 +753,29 @@ function App() {
 `;
 }
 
-// Wrap JSX in complete HTML document
-function buildHTML(jsxComponent, analysis, ds) {
+// Helper: hex → "r,g,b" string for rgba()
+function hexToRgb(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return '0,0,0';
+  return `${parseInt(result[1], 16)},${parseInt(result[2], 16)},${parseInt(result[3], 16)}`;
+}
+
+// REGLA 3: Build HTML wrapper with real Google Fonts if available
+function buildHTML(jsxComponent, analysis, ds, assets) {
   const copy = analysis.seo_copy_analysis?.rewritten_copy || {};
-  const metaTitle = copy.meta_title || 'GrowBy — Agencia Digital | Diseño, Desarrollo e IA en LatAm';
-  const metaDesc = copy.meta_description || 'Especialistas digitales en diseño UX, desarrollo web, IA y marketing.';
-  const headingFont = ds.fonts.heading;
-  const bodyFont = ds.fonts.body;
+  const metaTitle = copy.meta_title || analysis.scraping?.title || 'GrowBy — Agencia Digital';
+  const metaDesc = copy.meta_description || analysis.scraping?.description || 'Especialistas digitales.';
   const colors = ds.colors;
+
+  // REGLA 3: Use real Google Fonts URL if detected, otherwise construct from detected fonts
+  let fontsLink;
+  if (assets?.google_fonts_url) {
+    fontsLink = `<link href="${assets.google_fonts_url}" rel="stylesheet" />`;
+  } else {
+    const headingFont = ds.fonts.heading.replace(/\s+/g, '+');
+    const bodyFont = ds.fonts.body.replace(/\s+/g, '+');
+    fontsLink = `<link href="https://fonts.googleapis.com/css2?family=${headingFont}:wght@400;600;700;800&family=${bodyFont}:wght@400;500;600&display=swap" rel="stylesheet" />`;
+  }
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -719,7 +792,7 @@ function buildHTML(jsxComponent, analysis, ds) {
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=${headingFont}:wght@400;600;700;800&family=${bodyFont}:wght@400;500;600&display=swap" rel="stylesheet" />
+  ${fontsLink}
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
@@ -736,8 +809,13 @@ function buildHTML(jsxComponent, analysis, ds) {
       to   { opacity: 1; transform: translateY(0); }
     }
     @keyframes ctaPulse {
-      0%, 100% { transform: scale(1); box-shadow: 0 8px 40px rgba(245,158,11,0.4); }
-      50%       { transform: scale(1.03); box-shadow: 0 12px 48px rgba(245,158,11,0.6); }
+      0%, 100% { transform: scale(1); box-shadow: 0 8px 40px ${colors.accent}66; }
+      50%       { transform: scale(1.03); box-shadow: 0 12px 48px ${colors.accent}88; }
+    }
+    /* REGLA 5: Logo carousel animation */
+    @keyframes logoScroll {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
     }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -770,42 +848,43 @@ export async function generate(analysisPath) {
 
   const analysis = JSON.parse(fs.readFileSync(analysisPath, 'utf8'));
   const outputDir = path.dirname(analysisPath);
-  const ds = mapDesignSystem(analysis.ui_analysis?.design_system || {});
+
+  // REGLA 1-3: Load real assets from scraping
+  const assets = analysis.scraping?.assets || null;
+
+  // REGLA 2-3: Map DS using brand colors and fonts from assets
+  const ds = mapDesignSystem(analysis.ui_analysis?.design_system || {}, assets);
+
   const imagePrompts = analysis.visual_analysis?.image_prompts || [];
   const timestamp = analysis.meta?.timestamp || Date.now();
 
-  // Generate images
+  // Asset summary
+  console.log('\n  📦 Assets del sitio original:');
+  console.log(`     Logo:            ${assets?.logo_url ? '✅ ' + assets.logo_url.slice(0,60) : '❌ no encontrado'}`);
+  console.log(`     Colores de marca: ${assets?.colors?.length ? '✅ ' + (assets.colors.slice(0,3).join(', ') || '-') : '❌'}`);
+  console.log(`     Google Fonts:    ${assets?.google_fonts_url ? '✅' : '❌'}`);
+  console.log(`     Imágenes reales: ${assets?.images?.length || 0}`);
+  console.log(`     Logos clientes:  ${assets?.client_logos?.length || 0}`);
+  console.log(`     Colores aplicados: ${ds.colors.primary} · ${ds.colors.secondary}`);
+
+  // Generate Gemini images (REGLA 4: only for sections without real images)
   console.log(`\n  🖼️  Generando ${imagePrompts.length} imágenes via Gemini API...`);
-  const images = await generateAllImages(imagePrompts, timestamp);
-  const generatedCount = Object.values(images).filter(Boolean).length;
-  console.log(`  ✓ ${generatedCount}/${imagePrompts.length} imágenes generadas`);
+  const geminiImages = await generateAllImages(imagePrompts, timestamp);
+  const generatedCount = Object.values(geminiImages).filter(Boolean).length;
+  console.log(`  ✓ ${generatedCount}/${imagePrompts.length} imágenes Gemini`);
 
   // Build artifact
-  console.log('\n  🔨 Construyendo artifact React...');
-  const jsxComponent = buildJSXComponent(analysis, images, ds);
+  console.log('\n  🔨 Construyendo artifact React con assets reales...');
+  const jsxComponent = buildJSXComponent(analysis, geminiImages, ds, assets);
 
-  // Save redesign.jsx (component only)
   const jsxPath = path.join(outputDir, 'redesign.jsx');
   fs.writeFileSync(jsxPath, jsxComponent);
   console.log(`  ✓ redesign.jsx (${Math.round(jsxComponent.length / 1024)}KB)`);
 
-  // Build and save index.html
-  const html = buildHTML(jsxComponent, analysis, ds);
+  const html = buildHTML(jsxComponent, analysis, ds, assets);
   const htmlPath = path.join(outputDir, 'index.html');
   fs.writeFileSync(htmlPath, html);
   console.log(`  ✓ index.html (${Math.round(html.length / 1024)}KB)`);
 
   return { outputDir, jsxPath, htmlPath, imagesGenerated: generatedCount, totalImages: imagePrompts.length };
-}
-
-// CLI mode
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const analysisPath = process.argv[2];
-  if (!analysisPath) {
-    console.error('Uso: node scripts/generator.js <path/to/analysis.json>');
-    process.exit(1);
-  }
-  generate(path.resolve(analysisPath))
-    .then(r => console.log(`\n✅ Artifact generado en: ${r.outputDir}`))
-    .catch(err => { console.error('❌', err.message); process.exit(1); });
 }

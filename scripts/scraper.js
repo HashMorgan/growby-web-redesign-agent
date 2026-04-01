@@ -27,6 +27,164 @@ function detectIndustry(text) {
   return top[1] > 0 ? top[0] : 'general';
 }
 
+// --- Asset extraction from HTML ---
+function toAbsoluteUrl(href, baseUrl) {
+  if (!href) return null;
+  if (href.startsWith('data:')) return null;
+  if (href.startsWith('http://') || href.startsWith('https://')) return href;
+  try {
+    return new URL(href, baseUrl).href;
+  } catch {
+    return null;
+  }
+}
+
+function extractAssets(html, baseUrl) {
+  const assets = {
+    logo_url: null,
+    colors: [],
+    fonts: [],
+    google_fonts_url: null,
+    images: [],
+    client_logos: [],
+    videos: [],
+  };
+
+  // ── Logo ──────────────────────────────────────────────────────────────────
+  // Strategy: look inside <header> or <nav> first, then fallback to page-wide logo search
+
+  // Extract header/nav HTML block for more precise logo detection
+  const headerMatch = /<(?:header|nav)[^>]*>([\s\S]{0,3000}?)<\/(?:header|nav)>/i.exec(html);
+  const headerHtml = headerMatch ? headerMatch[1] : '';
+  const searchScopes = headerHtml ? [headerHtml, html] : [html];
+
+  for (const scope of searchScopes) {
+    if (assets.logo_url) break;
+    const logoPatterns = [
+      // img with "logo" in class/id/alt
+      /<img[^>]+(?:class|id|alt)=["'][^"']*logo[^"']*["'][^>]*src=["']([^"']+)["'][^>]*>/gi,
+      /<img[^>]+src=["']([^"']+)["'][^>]*(?:class|id|alt)=["'][^"']*logo[^"']*["'][^>]*>/gi,
+      // img with "logo" in src path
+      /<img[^>]+src=["']([^"']*[\/\-_]logo[^"']*)["'][^>]*>/gi,
+    ];
+    for (const pattern of logoPatterns) {
+      const match = pattern.exec(scope);
+      if (match) {
+        const abs = toAbsoluteUrl(match[1], baseUrl);
+        if (abs) { assets.logo_url = abs; break; }
+      }
+    }
+  }
+
+  // Fallback: first SVG in header
+  if (!assets.logo_url && headerHtml) {
+    const svgMatch = /<img[^>]+src=["']([^"']*\.svg[^"']*)["'][^>]*>/gi.exec(headerHtml);
+    if (svgMatch) {
+      const abs = toAbsoluteUrl(svgMatch[1], baseUrl);
+      if (abs) assets.logo_url = abs;
+    }
+  }
+
+  // ── Colors ────────────────────────────────────────────────────────────────
+  // meta theme-color
+  const themeColorMatch = /<meta[^>]*name=["']theme-color["'][^>]*content=["']([^"']+)["']/i.exec(html);
+  if (themeColorMatch) assets.colors.push(themeColorMatch[1]);
+
+  // CSS :root custom properties
+  const rootMatch = /:root\s*\{([^}]+)\}/g;
+  let m;
+  while ((m = rootMatch.exec(html)) !== null) {
+    const props = m[1].match(/(#[0-9a-fA-F]{3,8}|rgb\([^)]+\))/g) || [];
+    assets.colors.push(...props);
+  }
+
+  // Inline style colors (frequent hex values)
+  const hexMatches = html.match(/#[0-9a-fA-F]{6}\b/g) || [];
+  const hexFreq = {};
+  for (const hex of hexMatches) {
+    hexFreq[hex] = (hexFreq[hex] || 0) + 1;
+  }
+  const topHex = Object.entries(hexFreq)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([hex]) => hex);
+  assets.colors.push(...topHex);
+
+  // Deduplicate and take top 5
+  assets.colors = [...new Set(assets.colors)].slice(0, 5);
+
+  // ── Google Fonts ─────────────────────────────────────────────────────────
+  const gFontsMatch = /<link[^>]+href=["'](https:\/\/fonts\.googleapis\.com[^"']+)["'][^>]*>/gi.exec(html);
+  if (gFontsMatch) {
+    assets.google_fonts_url = gFontsMatch[1];
+  }
+
+  // font-family values from CSS
+  const fontFamilyMatches = html.match(/font-family:\s*['"]?([^;,"']+)/gi) || [];
+  const fontNames = fontFamilyMatches
+    .map(f => f.replace(/font-family:\s*['"]?/i, '').trim())
+    .filter(f => f && !f.startsWith('-') && f.length > 2 && f.length < 40)
+    .slice(0, 4);
+  assets.fonts = [...new Set(fontNames)];
+
+  // ── Images ────────────────────────────────────────────────────────────────
+  const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+  const imgUrls = [];
+  while ((m = imgRegex.exec(html)) !== null) {
+    const src = m[0];
+    const url = toAbsoluteUrl(m[1], baseUrl);
+    if (!url) continue;
+    // Skip likely icons/tiny images (by name pattern)
+    const lowerUrl = url.toLowerCase();
+    if (/icon|favicon|sprite|badge|arrow|chevron|close|menu|star|check|bullet/i.test(lowerUrl)) continue;
+    // Skip data URIs already filtered by toAbsoluteUrl
+    imgUrls.push(url);
+  }
+
+  // CSS background-image
+  const bgImgRegex = /background(?:-image)?:\s*url\(['"]?([^'")\s]+)['"]?\)/gi;
+  while ((m = bgImgRegex.exec(html)) !== null) {
+    const url = toAbsoluteUrl(m[1], baseUrl);
+    if (url && !/icon|favicon|sprite/i.test(url)) imgUrls.push(url);
+  }
+
+  assets.images = [...new Set(imgUrls)].slice(0, 20);
+
+  // ── Client logos ─────────────────────────────────────────────────────────
+  // Find sections with "client", "partner", "logo", "brand", "trust", "cliente" in class
+  const clientSectionRegex = /<(?:section|div|ul)[^>]+class=["'][^"']*(?:client|partner|logo|brand|trust|cliente|aliado|marca)[^"']*["'][^>]*>([\s\S]*?)<\/(?:section|div|ul)>/gi;
+  while ((m = clientSectionRegex.exec(html)) !== null) {
+    const sectionHtml = m[1];
+    const sectionImgs = sectionHtml.match(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi) || [];
+    for (const imgTag of sectionImgs) {
+      const srcMatch = /src=["']([^"']+)["']/.exec(imgTag);
+      if (srcMatch) {
+        const url = toAbsoluteUrl(srcMatch[1], baseUrl);
+        if (url) assets.client_logos.push(url);
+      }
+    }
+    // Also check alt text for brand names
+  }
+
+  // Deduplicate client logos
+  assets.client_logos = [...new Set(assets.client_logos)].slice(0, 20);
+
+  // ── Videos ───────────────────────────────────────────────────────────────
+  // YouTube/Vimeo iframes
+  const iframeRegex = /<iframe[^>]+src=["']([^"']*(?:youtube|vimeo)[^"']*)["'][^>]*>/gi;
+  while ((m = iframeRegex.exec(html)) !== null) {
+    assets.videos.push(m[1]);
+  }
+  // HTML5 video
+  const videoRegex = /<video[^>]*>[\s\S]*?<source[^>]+src=["']([^"']+)["']/gi;
+  while ((m = videoRegex.exec(html)) !== null) {
+    const url = toAbsoluteUrl(m[1], baseUrl);
+    if (url) assets.videos.push(url);
+  }
+
+  return assets;
+}
+
 // --- Firecrawl scrape ---
 async function scrapeWithFirecrawl(url) {
   const apiKey = process.env.FIRECRAWL_API_KEY;
@@ -41,7 +199,7 @@ async function scrapeWithFirecrawl(url) {
     body: JSON.stringify({
       url,
       formats: ['markdown', 'html'],
-      includeTags: ['title', 'meta', 'h1', 'h2', 'h3', 'p', 'img', 'a'],
+      // No includeTags filter — get full HTML for asset extraction
     }),
   });
 
@@ -76,12 +234,10 @@ async function scrapeWithFallback(url) {
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const html = await response.text();
 
-  // Extract basic metadata from HTML
   const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
   const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
   const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
 
-  // Convert HTML to rough markdown (headings + paragraphs)
   const markdown = html
     .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n')
     .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n')
@@ -119,8 +275,21 @@ export async function scrape(url) {
     console.log('  ✓ Fallback OK');
   }
 
-  const industria = detectIndustry(result.markdown + ' ' + result.metadata.title + ' ' + result.metadata.description);
+  const industria = detectIndustry(
+    result.markdown + ' ' + result.metadata.title + ' ' + result.metadata.description
+  );
   console.log(`  🏭 Industria detectada: ${industria}`);
+
+  // Extract visual assets from HTML
+  console.log('  🎨 Extrayendo assets visuales...');
+  const assets = extractAssets(result.html, url);
+  console.log(`     Logo: ${assets.logo_url ? '✅ ' + assets.logo_url.slice(0, 60) : '❌ no detectado'}`);
+  console.log(`     Colores: ${assets.colors.length > 0 ? '✅ ' + assets.colors.slice(0, 3).join(', ') : '❌ ninguno'}`);
+  console.log(`     Fuentes: ${assets.fonts.length > 0 ? '✅ ' + assets.fonts.slice(0, 2).join(', ') : '❌ ninguna'}`);
+  console.log(`     Google Fonts: ${assets.google_fonts_url ? '✅' : '❌'}`);
+  console.log(`     Imágenes: ${assets.images.length}`);
+  console.log(`     Logos clientes: ${assets.client_logos.length}`);
+  console.log(`     Videos: ${assets.videos.length}`);
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const output = {
@@ -128,6 +297,7 @@ export async function scrape(url) {
     timestamp,
     ...result,
     industria_detectada: industria,
+    assets,
   };
 
   const outPath = path.join(PROJECT_ROOT, 'memory', 'working', `scraping-${timestamp}.json`);

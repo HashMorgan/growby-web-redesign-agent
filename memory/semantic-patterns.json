@@ -1,8 +1,64 @@
 {
-  "version": "1.1.0",
+  "meta": {
+    "version": "1.0.0",
+    "proyecto": "PRY-AGT-001 Web Redesign Agent",
+    "owner": "Kevin Yarlequé / GrowBy",
+    "interfaz_web": "agent-redesign.growby.tech",
+    "ultimo_update": "2026-04-01",
+    "sesiones_completadas": ["S1-fundacion", "S2-analisis", "S3-generator"],
+    "sesion_pendiente": "S4-interfaz-web"
+  },
+  "version": "1.2.0",
   "last_updated": "2026-04-01",
   "patterns": {
+    "all_industries": [
+      {
+        "pattern": "preservar_identidad_visual_original_es_prioritario_sobre_design_system_generico",
+        "confidence": 1.0,
+        "applications": 1,
+        "source": "kevin_feedback_growby_tech_2026_04_01",
+        "created": "2026-04-01",
+        "description": "Usar logo, colores y tipografías reales del sitio original. El design system de ui-agent solo aplica como fallback si no se detectan assets de marca."
+      },
+      {
+        "pattern": "extraer_assets_reales_logo_colores_tipografias_imagenes_clientes_antes_de_generar",
+        "confidence": 1.0,
+        "applications": 1,
+        "source": "kevin_feedback_growby_tech_2026_04_01",
+        "created": "2026-04-01",
+        "description": "El scraper debe extraer: logo URL, colores CSS, Google Fonts URL, imágenes reales, logos de clientes, videos. Guardar en assets{} del JSON de scraping."
+      },
+      {
+        "pattern": "carrusel_logos_clientes_debe_tener_animacion_css_infinita_seamless",
+        "confidence": 1.0,
+        "applications": 1,
+        "source": "kevin_feedback_growby_tech_2026_04_01",
+        "created": "2026-04-01",
+        "description": "@keyframes logoScroll con transform: translateX(-50%), duplicar items para loop seamless, velocidad 30s linear infinite. Si hay logos reales: usar <img>. Si no: texto con font de marca."
+      }
+    ],
     "agency": [
+      {
+        "pattern": "preservar_identidad_visual_original_es_prioritario_sobre_design_system_generico",
+        "confidence": 1.0,
+        "applications": 1,
+        "source": "kevin_feedback_growby_tech_2026_04_01",
+        "created": "2026-04-01"
+      },
+      {
+        "pattern": "extraer_assets_reales_logo_colores_tipografias_imagenes_clientes_antes_de_generar",
+        "confidence": 1.0,
+        "applications": 1,
+        "source": "kevin_feedback_growby_tech_2026_04_01",
+        "created": "2026-04-01"
+      },
+      {
+        "pattern": "carrusel_logos_clientes_debe_tener_animacion_css_infinita_seamless",
+        "confidence": 1.0,
+        "applications": 1,
+        "source": "kevin_feedback_growby_tech_2026_04_01",
+        "created": "2026-04-01"
+      },
       {
         "pattern": "hero_con_casos_de_exito_convierte_mejor_que_hero_lifestyle",
         "confidence": 0.8,

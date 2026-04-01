@@ -76,13 +76,14 @@ async function run(url) {
       url,
       timestamp,
       industria: industry,
-      agent_version: 'v0.3.0',
+      agent_version: 'v0.3.1',
     },
     scraping: {
       source: scrapingData.source,
       title: scrapingData.metadata.title,
       description: scrapingData.metadata.description,
       markdown_length: scrapingData.markdown.length,
+      assets: scrapingData.assets || null,   // REGLA 1-4: real visual assets
     },
     ui_analysis: uiResult,
     ux_analysis: uxResult,
