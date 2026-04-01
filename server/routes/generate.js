@@ -1,5 +1,5 @@
 import express from 'express';
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -81,31 +81,64 @@ async function runPipeline(url, jobId) {
 
     process.on('exit', (code) => {
       if (code === 0) {
-        // Find the Netlify URL from output
+        // Find the Netlify URL from orchestrator output
         let netlifyUrl = null;
         const urlMatch = buffer.match(/https:\/\/[a-z0-9-]+\.netlify\.app/);
-        if (urlMatch) {
-          netlifyUrl = urlMatch[0];
-        }
+        if (urlMatch) netlifyUrl = urlMatch[0];
 
-        // Check if deploy-url.txt exists
+        // Check if deploy-url.txt was written by orchestrator
         const urlFile = path.join(outputPath, 'deploy-url.txt');
         if (fs.existsSync(urlFile)) {
           netlifyUrl = fs.readFileSync(urlFile, 'utf8').trim();
         }
 
+        // Find actual output folder — orchestrator may have created it independently
+        let actualOutputPath = outputPath;
+        const outputsDir = path.join(PROJECT_ROOT, 'outputs');
+        if (fs.existsSync(outputsDir)) {
+          const folders = fs.readdirSync(outputsDir)
+            .filter(f => f.startsWith(clientSlug))
+            .sort()
+            .reverse();
+          if (folders.length > 0) {
+            actualOutputPath = path.join(outputsDir, folders[0]);
+          }
+        }
+
+        // If still no Netlify URL, try to deploy now
+        if (!netlifyUrl && fs.existsSync(path.join(actualOutputPath, 'index.html'))) {
+          try {
+            emit('deploying', '🚀 Publicando en Netlify...', 95);
+            const siteName = `growby-${clientSlug.slice(0, 30)}-redesign`;
+            const deployOut = execSync(
+              `netlify deploy --dir="${actualOutputPath}" --prod --site-name=${siteName} --json`,
+              { encoding: 'utf8', timeout: 60000 }
+            );
+            const deployData = JSON.parse(deployOut);
+            netlifyUrl = deployData.url || deployData.deploy_url || null;
+          } catch (deployErr) {
+            console.warn('Netlify deploy fallback failed:', deployErr.message.slice(0, 200));
+          }
+        }
+
+        // Final fallback: serve locally via /preview route — NEVER emit file://
+        if (!netlifyUrl) {
+          const folder = path.basename(actualOutputPath);
+          netlifyUrl = `/preview/${folder}/index.html`;
+        }
+
         // Store job data
         activeJobs.set(jobId, {
           url,
-          outputPath,
+          outputPath: actualOutputPath,
           netlifyUrl,
           version: 1,
           createdAt: new Date().toISOString()
         });
 
         emit('complete', '✅ Rediseño listo', 100, {
-          netlifyUrl: netlifyUrl || `file://${outputPath}/index.html`,
-          outputPath
+          netlifyUrl,
+          outputPath: actualOutputPath
         });
       } else {
         emit('error', `❌ Error: El pipeline falló con código ${code}`, 0);

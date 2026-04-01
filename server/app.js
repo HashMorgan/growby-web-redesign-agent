@@ -143,6 +143,9 @@ app.get('/api/health', (req, res) =>
   }),
 );
 
+// ── Preview route — serves generated redesigns (auth-protected) ──────────────
+app.use('/preview', requireAuth, express.static(path.join(__dirname, '../outputs')));
+
 // ── Static assets (css, js, images) — after auth routes ──────────────────────
 app.use(express.static(path.join(__dirname, 'client')));
 

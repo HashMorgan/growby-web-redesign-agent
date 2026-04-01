@@ -373,23 +373,61 @@ function handleComplete(data) {
   uiManager.showResult();
   uiManager.setGenerateButtonState('complete');
 
-  const { netlifyUrl, outputPath } = data;
-  uiManager.elements.netlifyUrl.value = netlifyUrl || '';
-  uiManager.loadPreview(netlifyUrl || '');
+  const { netlifyUrl } = data;
 
-  jobManager.versions[0].url = netlifyUrl;
+  // Build the shareable URL — /preview/... needs origin prefix
+  const isNetlify = netlifyUrl && netlifyUrl.startsWith('https://');
+  const isPreview = netlifyUrl && netlifyUrl.startsWith('/preview/');
+  const shareUrl = isNetlify
+    ? netlifyUrl
+    : isPreview
+      ? window.location.origin + netlifyUrl
+      : null;
+
+  // iframe can use the netlifyUrl directly (works for both https:// and /preview/)
+  const previewSrc = isNetlify || isPreview ? netlifyUrl : null;
+
+  uiManager.elements.netlifyUrl.value = shareUrl || netlifyUrl || '';
+  if (previewSrc) uiManager.loadPreview(previewSrc);
+
+  jobManager.versions[0].url = shareUrl || netlifyUrl;
   uiManager.updateVersions(jobManager.versions, 1);
 
-  toastManager.success('✅ Rediseño publicado en Netlify');
+  // Update preview label with client hostname
+  try {
+    const labelEl = document.getElementById('previewLabel');
+    if (labelEl && currentJobUrl) {
+      labelEl.textContent = `Vista previa del rediseño — ${new URL(currentJobUrl).hostname}`;
+    }
+  } catch (_) {}
 
-  // Setup buttons
-  uiManager.elements.copyUrlBtn.onclick = () => {
-    navigator.clipboard.writeText(uiManager.elements.netlifyUrl.value);
-    toastManager.success('URL copiada al portapapeles', 2000);
+  toastManager.success(isNetlify ? '✅ Rediseño publicado en Netlify' : '✅ Rediseño listo — previsualización disponible');
+
+  // Copy URL button
+  uiManager.elements.copyUrlBtn.onclick = async () => {
+    const url = uiManager.elements.netlifyUrl.value;
+    if (!url || url.startsWith('file://')) {
+      toastManager.error('URL no disponible aún');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toastManager.success('URL copiada al portapapeles', 2000);
+    } catch (_) {
+      uiManager.elements.netlifyUrl.select();
+      document.execCommand('copy');
+      toastManager.success('URL copiada', 2000);
+    }
   };
 
+  // Open in new tab button
   uiManager.elements.openTabBtn.onclick = () => {
-    window.open(uiManager.elements.netlifyUrl.value, '_blank');
+    const url = uiManager.elements.netlifyUrl.value;
+    if (!url || url.startsWith('file://')) {
+      toastManager.error('URL no disponible');
+      return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 }
 
@@ -415,6 +453,8 @@ function handleError(data) {
 
 // ─── GENERATE REDESIGN ─────────────────────────────────────────────────────
 
+let currentJobUrl = null;
+
 uiManager.elements.generateBtn.onclick = async () => {
   const url = uiManager.elements.urlInput.value.trim();
   console.log('Botón clickeado, URL:', url);
@@ -436,6 +476,7 @@ uiManager.elements.generateBtn.onclick = async () => {
     const data = await response.json();
 
     if (response.ok) {
+      currentJobUrl = url;
       jobManager.startJob(data.jobId);
       uiManager.showProgress();
     } else {
@@ -526,6 +567,19 @@ uiManager.elements.approveBtn.onclick = async () => {
     uiManager.elements.approveBtn.textContent = '✅ Aprobar y Guardar Aprendizaje';
   }
 };
+
+// ─── FULLSCREEN BUTTON ─────────────────────────────────────────────────────
+
+document.getElementById('fullscreenBtn')?.addEventListener('click', () => {
+  const iframe = uiManager.elements.previewIframe;
+  if (iframe.requestFullscreen) {
+    iframe.requestFullscreen();
+  } else if (iframe.webkitRequestFullscreen) {
+    iframe.webkitRequestFullscreen();
+  } else if (iframe.src) {
+    window.open(iframe.src, '_blank', 'noopener,noreferrer');
+  }
+});
 
 // ─── ENTER KEY HANDLER ─────────────────────────────────────────────────────
 
