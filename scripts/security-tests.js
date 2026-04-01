@@ -100,7 +100,7 @@ function startServer() {
     });
 
     serverProcess.stdout.on('data', (data) => {
-      if (data.toString().includes('Listo para recibir')) {
+      if (data.toString().includes('Dashboard:') || data.toString().includes('Auth:')) {
         resolve();
       }
     });
@@ -130,7 +130,7 @@ async function testHealthEndpoint() {
     const res = await fetch(`http://localhost:${PORT}/api/health`);
     if (res.ok) {
       const data = JSON.parse(res.body);
-      if (data.status === 'ok' && data.agent) {
+      if (data.status === 'ok' && (data.platform || data.agent)) {
         pass('Health endpoint responde correctamente');
       } else {
         fail('Health endpoint', 'Respuesta incompleta');
@@ -172,7 +172,7 @@ async function testRateLimiting() {
     const requests = [];
     for (let i = 0; i < 6; i++) {
       requests.push(
-        fetch(`http://localhost:${PORT}/api/login`, {
+        fetch(`http://localhost:${PORT}/api/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username: 'test', password: 'test' }),
@@ -204,7 +204,7 @@ async function testSQLInjection() {
     let vulnerable = false;
 
     for (const payload of maliciousPayloads) {
-      const res = await fetch(`http://localhost:${PORT}/api/login`, {
+      const res = await fetch(`http://localhost:${PORT}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: payload, password: 'test' }),
@@ -230,7 +230,7 @@ async function testSQLInjection() {
 async function testCSRF() {
   try {
     // Intentar hacer POST sin cookie de sesión
-    const res = await fetch(`http://localhost:${PORT}/api/generate`, {
+    const res = await fetch(`http://localhost:${PORT}/web-redesign/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: 'https://example.com' }),
@@ -252,7 +252,7 @@ async function testCSRF() {
 async function testPasswordHashing() {
   try {
     // Este test verifica que las contraseñas no se devuelvan en plain text
-    const res = await fetch(`http://localhost:${PORT}/api/login`, {
+    const res = await fetch(`http://localhost:${PORT}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'growby', password: 'wrong' }),
@@ -299,7 +299,7 @@ async function testSessionSecurity() {
 async function testXSSProtection() {
   try {
     const xssPayload = '<script>alert("xss")</script>';
-    const res = await fetch(`http://localhost:${PORT}/api/generate`, {
+    const res = await fetch(`http://localhost:${PORT}/web-redesign/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: xssPayload }),

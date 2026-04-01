@@ -3,121 +3,200 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GrowBy Redesign Agent — Acceso</title>
+  <title>GrowBy Agents — Acceso</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --purple:      #5D55D7;
-      --purple-dark: #4a43c4;
-      --purple-glow: rgba(93,85,215,0.35);
-      --bg:          #03081B;
-      --surface:     #0d1424;
-      --border:      rgba(255,255,255,0.08);
-      --text:        #e8eaf0;
-      --muted:       rgba(255,255,255,0.45);
-      --error:       #f87171;
-      --success:     #34d399;
+      --purple:       #5D55D7;
+      --purple-dark:  #4a43c4;
+      --purple-glow:  rgba(93,85,215,0.3);
+      --navy:         #03081B;
+      --text-dark:    #e8eaf0;
+      --muted-dark:   rgba(255,255,255,0.5);
+      --text-light:   #111827;
+      --muted-light:  #6b7280;
+      --border-light: #e5e7eb;
+      --error:        #ef4444;
     }
+
+    html, body { height: 100%; }
 
     body {
       font-family: 'Inter', system-ui, sans-serif;
-      background: var(--bg);
-      min-height: 100vh;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      /* Subtle grid pattern */
+      min-height: 100vh;
+    }
+
+    /* ── LEFT PANEL ──────────────────────────────── */
+    .panel-left {
+      width: 50%;
+      min-height: 100vh;
+      background: var(--navy);
       background-image:
+        linear-gradient(135deg, rgba(93,85,215,0.08) 0%, transparent 60%),
         linear-gradient(rgba(93,85,215,0.04) 1px, transparent 1px),
         linear-gradient(90deg, rgba(93,85,215,0.04) 1px, transparent 1px);
-      background-size: 40px 40px;
-    }
-
-    .login-wrapper {
-      width: 100%;
-      max-width: 400px;
-      padding: 24px;
-    }
-
-    /* Logo above card */
-    .logo-header {
+      background-size: auto, 40px 40px, 40px 40px;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      margin-bottom: 32px;
+      flex-direction: column;
+      padding: 48px 56px;
+      position: relative;
+      overflow: hidden;
     }
 
-    .logo-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 10px;
-      background: linear-gradient(135deg, var(--purple), #7c3aed);
+    .panel-left::before {
+      content: '';
+      position: absolute;
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(93,85,215,0.18) 0%, transparent 70%);
+      top: -100px; right: -100px;
+      pointer-events: none;
+    }
+
+    .panel-left::after {
+      content: '';
+      position: absolute;
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(93,85,215,0.1) 0%, transparent 70%);
+      bottom: -80px; left: -80px;
+      pointer-events: none;
+    }
+
+    .left-logo { margin-bottom: auto; padding-bottom: 32px; }
+    .left-logo img { height: 30px; width: auto; }
+
+    .left-content {
+      flex: 1;
       display: flex;
-      align-items: center;
+      flex-direction: column;
       justify-content: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .left-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--purple);
+      background: rgba(93,85,215,0.15);
+      border: 1px solid rgba(93,85,215,0.3);
+      border-radius: 100px;
+      padding: 4px 12px;
+      margin-bottom: 24px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      width: fit-content;
+    }
+
+    .left-title {
+      font-family: 'Sora', sans-serif;
+      font-size: clamp(1.8rem, 2.5vw, 2.4rem);
       font-weight: 800;
-      font-size: 1.15rem;
-      color: #fff;
-      box-shadow: 0 4px 20px var(--purple-glow);
+      color: var(--text-dark);
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin-bottom: 16px;
     }
 
-    .logo-text {
-      font-size: 1.25rem;
+    .left-subtitle {
+      font-size: 0.95rem;
+      color: var(--muted-dark);
+      line-height: 1.7;
+      margin-bottom: 48px;
+      max-width: 340px;
+    }
+
+    .left-bullets { list-style: none; display: flex; flex-direction: column; gap: 14px; }
+
+    .left-bullets li {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.88rem;
+      color: rgba(255,255,255,0.72);
+      font-weight: 500;
+    }
+
+    .bullet-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--purple);
+      flex-shrink: 0;
+      box-shadow: 0 0 8px var(--purple-glow);
+    }
+
+    .left-footer {
+      margin-top: auto;
+      padding-top: 48px;
+      font-size: 0.72rem;
+      color: rgba(255,255,255,0.2);
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── RIGHT PANEL ─────────────────────────────── */
+    .panel-right {
+      width: 50%;
+      min-height: 100vh;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 40px;
+    }
+
+    .form-container {
+      width: 100%;
+      max-width: 380px;
+      animation: fadeInUp 0.5s ease;
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .form-title {
+      font-family: 'Sora', sans-serif;
+      font-size: 1.75rem;
       font-weight: 700;
-      color: var(--text);
-      letter-spacing: -0.02em;
+      color: var(--text-light);
+      letter-spacing: -0.025em;
+      margin-bottom: 8px;
     }
 
-    /* Card */
-    .login-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 36px 32px;
-      box-shadow: 0 24px 64px rgba(0,0,0,0.4), 0 0 0 1px var(--border);
-    }
-
-    .login-card h1 {
-      font-size: 1.4rem;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 6px;
-      letter-spacing: -0.02em;
-    }
-
-    .login-card .subtitle {
+    .form-subtitle {
       font-size: 0.875rem;
-      color: var(--muted);
-      margin-bottom: 28px;
+      color: var(--muted-light);
+      margin-bottom: 36px;
+      line-height: 1.6;
     }
 
-    /* Form fields */
-    .field {
-      margin-bottom: 18px;
-    }
+    .field { margin-bottom: 20px; }
 
     .field label {
       display: block;
-      font-size: 0.8rem;
+      font-size: 0.82rem;
       font-weight: 600;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: 8px;
+      color: #374151;
+      margin-bottom: 7px;
     }
 
     .field input {
       width: 100%;
-      padding: 12px 14px;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid var(--border);
+      padding: 11px 14px;
+      background: #fff;
+      border: 1.5px solid var(--border-light);
       border-radius: 8px;
-      color: var(--text);
-      font-size: 0.95rem;
+      color: var(--text-light);
+      font-size: 0.9rem;
       font-family: inherit;
       outline: none;
       transition: border-color 0.2s, box-shadow 0.2s;
@@ -125,96 +204,87 @@
 
     .field input:focus {
       border-color: var(--purple);
-      box-shadow: 0 0 0 3px var(--purple-glow);
+      box-shadow: 0 0 0 3px rgba(93,85,215,0.12);
     }
 
-    .field input::placeholder { color: var(--muted); }
+    .field input::placeholder { color: #9ca3af; }
 
-    /* Password wrapper with toggle */
-    .password-wrapper {
-      position: relative;
-    }
+    .pw-wrapper { position: relative; }
+    .pw-wrapper input { padding-right: 44px; }
 
-    .password-wrapper input {
-      padding-right: 44px;
-    }
-
-    .toggle-pw {
+    .pw-toggle {
       position: absolute;
-      right: 12px;
-      top: 50%;
+      right: 12px; top: 50%;
       transform: translateY(-50%);
-      background: none;
-      border: none;
+      background: none; border: none;
       cursor: pointer;
-      color: var(--muted);
-      font-size: 1rem;
+      color: #9ca3af;
       padding: 4px;
+      line-height: 0;
       transition: color 0.2s;
-      line-height: 1;
     }
-    .toggle-pw:hover { color: var(--text); }
+    .pw-toggle:hover { color: #6b7280; }
 
-    /* Submit button */
     #btn-login {
       width: 100%;
-      padding: 13px;
+      padding: 12px;
       margin-top: 8px;
       background: var(--purple);
       color: #fff;
       font-family: inherit;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       font-weight: 600;
       border: none;
       border-radius: 8px;
       cursor: pointer;
-      transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
-      box-shadow: 0 4px 16px var(--purple-glow);
+      box-shadow: 0 4px 14px rgba(93,85,215,0.35);
+      transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
     }
 
     #btn-login:hover:not(:disabled) {
       background: var(--purple-dark);
-      box-shadow: 0 6px 24px var(--purple-glow);
+      box-shadow: 0 6px 20px rgba(93,85,215,0.45);
     }
 
-    #btn-login:active:not(:disabled) {
-      transform: scale(0.98);
-    }
+    #btn-login:active:not(:disabled) { transform: scale(0.98); }
+    #btn-login:disabled { opacity: 0.65; cursor: not-allowed; }
 
-    #btn-login:disabled {
-      opacity: 0.65;
-      cursor: not-allowed;
-    }
-
-    /* Spinner */
     .spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid rgba(255,255,255,0.3);
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.35);
       border-top-color: #fff;
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
       display: none;
     }
     .loading .spinner { display: block; }
-
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Error message */
     #error-msg {
-      min-height: 20px;
+      min-height: 18px;
       margin-top: 14px;
-      font-size: 0.84rem;
+      font-size: 0.83rem;
       color: var(--error);
       text-align: center;
       font-weight: 500;
     }
 
-    /* Shake animation */
+    .forgot-link {
+      display: block;
+      text-align: center;
+      margin-top: 18px;
+      font-size: 0.83rem;
+      color: var(--purple);
+      text-decoration: none;
+      font-weight: 500;
+      opacity: 0.8;
+    }
+    .forgot-link:hover { opacity: 1; }
+
     @keyframes shake {
       0%, 100% { transform: translateX(0); }
       20%       { transform: translateX(-8px); }
@@ -224,98 +294,157 @@
     }
     .shake { animation: shake 0.45s ease; }
 
-    /* Footer */
-    .login-footer {
-      text-align: center;
-      margin-top: 24px;
-      font-size: 0.78rem;
-      color: rgba(255,255,255,0.2);
+    /* ── RESPONSIVE ─────────────────────────────── */
+    @media (max-width: 767px) {
+      body { display: block; }
+      .panel-left { display: none; }
+
+      .panel-right {
+        width: 100%;
+        min-height: 100vh;
+        background: var(--navy);
+        background-image:
+          linear-gradient(rgba(93,85,215,0.04) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(93,85,215,0.04) 1px, transparent 1px);
+        background-size: 40px 40px;
+        padding: 40px 24px;
+        align-items: flex-start;
+      }
+
+      .form-container { max-width: 100%; padding-top: 8px; }
+
+      .mobile-logo {
+        display: block;
+        margin-bottom: 36px;
+      }
+
+      .form-title { color: #fff; }
+      .form-subtitle { color: rgba(255,255,255,0.5); }
+      .field label { color: rgba(255,255,255,0.7); }
+
+      .field input {
+        background: rgba(255,255,255,0.06);
+        border-color: rgba(255,255,255,0.12);
+        color: #fff;
+      }
+
+      .field input:focus {
+        border-color: var(--purple);
+        box-shadow: 0 0 0 3px rgba(93,85,215,0.2);
+      }
+
+      .field input::placeholder { color: rgba(255,255,255,0.28); }
+      .pw-toggle { color: rgba(255,255,255,0.35); }
+      #error-msg { color: #fca5a5; }
+    }
+
+    @media (min-width: 768px) {
+      .mobile-logo { display: none; }
     }
   </style>
 </head>
 <body>
 
-<div class="login-wrapper">
+  <!-- LEFT PANEL -->
+  <div class="panel-left">
+    <div class="left-logo">
+      <img src="/logo-growby-dark.svg" alt="GrowBy" />
+    </div>
 
-  <div class="logo-header">
-    <div class="logo-icon">G</div>
-    <span class="logo-text">GrowBy</span>
+    <div class="left-content">
+      <div class="left-badge">✦ Plataforma interna</div>
+      <h1 class="left-title">GrowBy Agents</h1>
+      <p class="left-subtitle">Plataforma de agentes IA para el equipo GrowBy. Automatiza análisis, diseño y entrega en minutos.</p>
+
+      <ul class="left-bullets">
+        <li><span class="bullet-dot"></span>Rediseño web automático con IA</li>
+        <li><span class="bullet-dot"></span>Análisis UI · UX · SEO en minutos</li>
+        <li><span class="bullet-dot"></span>Deploy instantáneo a Netlify</li>
+      </ul>
+    </div>
+
+    <div class="left-footer">© 2026 GrowBy · Todos los derechos reservados</div>
   </div>
 
-  <div class="login-card" id="login-card">
-    <h1>Redesign Agent</h1>
-    <p class="subtitle">Acceso interno GrowBy</p>
+  <!-- RIGHT PANEL -->
+  <div class="panel-right">
+    <div class="form-container" id="form-container">
 
-    <form id="login-form" autocomplete="on" novalidate>
-      <div class="field">
-        <label for="username">Usuario</label>
-        <input
-          type="text"
-          id="username"
-          name="username"
-          autocomplete="username"
-          placeholder="growby"
-          required
-        >
-      </div>
+      <!-- Mobile-only logo -->
+      <img class="mobile-logo" src="/logo-growby-dark.svg" alt="GrowBy" style="height:28px;" />
 
-      <div class="field">
-        <label for="password">Contraseña</label>
-        <div class="password-wrapper">
+      <h2 class="form-title">Bienvenido de vuelta</h2>
+      <p class="form-subtitle">Ingresa tus credenciales para continuar</p>
+
+      <form id="login-form" autocomplete="on" novalidate>
+        <div class="field">
+          <label for="username">Correo electrónico</label>
           <input
-            type="password"
-            id="password"
-            name="password"
-            autocomplete="current-password"
-            placeholder="••••••••••••"
+            type="email"
+            id="username"
+            name="username"
+            autocomplete="email"
+            placeholder="info@growby.tech"
             required
-          >
-          <button type="button" class="toggle-pw" id="toggle-pw" aria-label="Mostrar contraseña">
-            👁
-          </button>
+          />
         </div>
-      </div>
 
-      <button type="submit" id="btn-login">
-        <span class="spinner" id="spinner"></span>
-        <span id="btn-text">Ingresar</span>
-      </button>
+        <div class="field">
+          <label for="password">Contraseña</label>
+          <div class="pw-wrapper">
+            <input
+              type="password"
+              id="password"
+              name="password"
+              autocomplete="current-password"
+              placeholder="••••••••••••"
+              required
+            />
+            <button type="button" class="pw-toggle" id="pw-toggle" aria-label="Mostrar contraseña">
+              <svg id="icon-eye" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+              <svg id="icon-eye-off" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+              </svg>
+            </button>
+          </div>
+        </div>
 
-      <p id="error-msg" role="alert" aria-live="polite"></p>
-    </form>
+        <button type="submit" id="btn-login">
+          <span class="spinner" id="spinner"></span>
+          <span id="btn-text">Ingresar</span>
+        </button>
+
+        <p id="error-msg" role="alert" aria-live="polite"></p>
+      </form>
+
+      <a href="#" class="forgot-link">¿Olvidaste tu contraseña?</a>
+    </div>
   </div>
-
-  <p class="login-footer">GrowBy · Uso interno exclusivo</p>
-</div>
 
 <script>
-  // Password toggle
-  document.getElementById('toggle-pw').addEventListener('click', () => {
-    const pw = document.getElementById('password');
-    const btn = document.getElementById('toggle-pw');
+  document.getElementById('pw-toggle').addEventListener('click', () => {
+    const pw  = document.getElementById('password');
+    const eye = document.getElementById('icon-eye');
+    const off = document.getElementById('icon-eye-off');
     if (pw.type === 'password') {
-      pw.type = 'text';
-      btn.textContent = '🙈';
-      btn.setAttribute('aria-label', 'Ocultar contraseña');
+      pw.type = 'text'; eye.style.display = 'none'; off.style.display = '';
     } else {
-      pw.type = 'password';
-      btn.textContent = '👁';
-      btn.setAttribute('aria-label', 'Mostrar contraseña');
+      pw.type = 'password'; eye.style.display = ''; off.style.display = 'none';
     }
   });
 
-  // Login form
   document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-
     const btn      = document.getElementById('btn-login');
     const spinner  = document.getElementById('spinner');
     const btnText  = document.getElementById('btn-text');
     const errorMsg = document.getElementById('error-msg');
-    const card     = document.getElementById('login-card');
+    const card     = document.getElementById('form-container');
 
-    // Loading state
-    btn.disabled  = true;
+    btn.disabled = true;
     btn.classList.add('loading');
     spinner.style.display = 'block';
     btnText.textContent   = 'Ingresando...';
@@ -334,20 +463,16 @@
 
       if (res.ok) {
         btnText.textContent = '✓ Acceso concedido';
+        btn.style.background = '#22c55e';
         setTimeout(() => { window.location.href = '/'; }, 300);
         return;
       }
 
       const data = await res.json().catch(() => ({}));
+      errorMsg.textContent = res.status === 429
+        ? (data.error || 'Demasiados intentos. Espera 15 minutos.')
+        : (data.error || 'Credenciales incorrectas');
 
-      // Rate limit
-      if (res.status === 429) {
-        errorMsg.textContent = data.error || 'Demasiados intentos. Espera 15 minutos.';
-      } else {
-        errorMsg.textContent = data.error || 'Credenciales incorrectas';
-      }
-
-      // Shake card
       card.classList.add('shake');
       setTimeout(() => card.classList.remove('shake'), 500);
 
@@ -355,7 +480,6 @@
       errorMsg.textContent = 'Error de red. Verifica tu conexión.';
     }
 
-    // Reset button
     btn.disabled = false;
     btn.classList.remove('loading');
     spinner.style.display = 'none';

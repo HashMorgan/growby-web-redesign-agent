@@ -15,7 +15,7 @@ function getDb() {
 export function requireAuth(req, res, next) {
   if (req.session?.userId) return next();
   // API requests → 401 JSON; page requests → redirect
-  if (req.path.startsWith('/api/') || req.xhr || req.headers.accept?.includes('application/json')) {
+  if (req.originalUrl.includes('/api/') || req.xhr || req.headers.accept?.includes('application/json')) {
     return res.status(401).json({ error: 'No autenticado', redirect: '/login' });
   }
   return res.redirect('/login');
@@ -55,7 +55,7 @@ export async function loginHandler(req, res) {
   let user;
   try {
     const db = getDb();
-    // Use parameterized query → SQL injection safe
+    // Accept username OR email — both stored in the username column
     user = db.prepare('SELECT id, username, password_hash FROM users WHERE username = ?').get(username);
     db.close();
   } catch (err) {
