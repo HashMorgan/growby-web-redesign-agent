@@ -109,42 +109,362 @@ function pickImage(siteImages, geminiImages, key, siteIndex = 0) {
   return null;
 }
 
-// GrowBy features based on analysis
-function buildGrowByFeatures(analysis) {
-  const copy = analysis.seo_copy_analysis?.rewritten_copy;
-  return [
-    { icon: '🚀', title: 'GrowBy Projects', description: 'Desarrollo de software, UX/UI, ecommerce e IA. Construimos soluciones a medida con el mejor talento de LatAm.' },
-    { icon: '🎯', title: 'Hiring & Staffing', description: 'Hunting TI, staff augmentation y outsourcing. Encontramos el talento que necesitas, cuando lo necesitas.' },
-    { icon: '🤖', title: 'GrowBy AI', description: 'IA conversacional, generativa y low-code. Automatizamos procesos y creamos experiencias inteligentes.' },
-    { icon: '📊', title: 'Resultados medibles', description: 'Más de 250 proyectos entregados. Trabajamos con métricas claras y entregamos resultados concretos desde el primer sprint.' },
-    { icon: '🌎', title: 'Talento LatAm', description: 'Red de +100,000 especialistas digitales en toda Latinoamérica. Talento de primer nivel, a costos competitivos.' },
-    { icon: '⚡', title: 'Entrega rápida', description: 'Primeros resultados en semanas, no meses. Metodología ágil con sprints de 2 semanas y demos continuas.' },
-  ];
+// ─── Extract client info from analysis ────────────────────────────────────────
+function extractClientInfo(analysis) {
+  const industry = analysis.meta?.industria || analysis.ui_analysis?.industria || 'general';
+  const scrapingBusiness = analysis.scraping?.business || {};
+  const scrapingBrand = analysis.scraping?.brand || {};
+  const metaTitle = analysis.scraping?.title || '';
+  const companyName = scrapingBusiness.company_name
+    || scrapingBrand.name
+    || metaTitle.split(/[\|—\-·]/)[0]?.trim()
+    || 'Empresa';
+  return { industry, companyName, business: scrapingBusiness, brand: scrapingBrand };
 }
 
-function buildTestimonials() {
-  return [
-    { name: 'María González', role: 'Directora de Tecnología', company: 'Cencosud', text: 'GrowBy entendió nuestros requerimientos desde el primer día. Entregaron el proyecto en tiempo récord con una calidad técnica excepcional.', rating: 5 },
-    { name: 'Carlos Herrera', role: 'CEO', company: 'Sodexo LatAm', text: 'El staff augmentation con GrowBy nos permitió escalar nuestro equipo de 5 a 20 desarrolladores en solo 3 semanas. Increíble.', rating: 5 },
-    { name: 'Ana Ramírez', role: 'VP de Producto', company: 'MAPFRE', text: 'Transformaron nuestro proceso de claims digitales con IA. Redujimos el tiempo de atención de 72h a menos de 6h.', rating: 5 },
-  ];
+// ─── Client features — from scraped services or industry defaults ─────────────
+function buildClientFeatures(analysis) {
+  const { industry, companyName, business } = extractClientInfo(analysis);
+
+  // Use scraped services if we have enough
+  if (business.key_services?.length >= 3) {
+    const icons = ['🏢','🔧','⚙️','✅','📐','🏗️','🔑','📊'];
+    return business.key_services.slice(0, 6).map((s, i) => ({
+      icon: icons[i % icons.length],
+      title: s.name,
+      description: s.description || s.name,
+    }));
+  }
+
+  // Industry-specific defaults — NO GrowBy content
+  const defaults = {
+    elevator_company: [
+      { icon: '🏢', title: 'Elevadores Residenciales', description: 'Soluciones de movilidad vertical para edificios residenciales y condominios. Diseño personalizado, instalación y garantía.' },
+      { icon: '🏗️', title: 'Elevadores Comerciales', description: 'Sistemas de transporte vertical para centros comerciales, oficinas y proyectos corporativos de alto tráfico.' },
+      { icon: '🏭', title: 'Elevadores Industriales', description: 'Montacargas y plataformas de carga para almacenes, plantas industriales y centros de distribución.' },
+      { icon: '🔧', title: 'Mantenimiento y Soporte', description: 'Contratos de mantenimiento preventivo y correctivo. Respuesta técnica rápida y piezas de repuesto originales.' },
+      { icon: '✅', title: 'Certificaciones y Garantía', description: 'Cumplimiento de normativas nacionales e internacionales (EN 81, ASME A17.1). Garantía en todos los equipos instalados.' },
+      { icon: '📐', title: 'Consultoría Técnica', description: 'Asesoría desde el diseño del proyecto hasta la puesta en marcha. Soluciones a medida para cada inmueble.' },
+    ],
+    saas: [
+      { icon: '⚡', title: 'Automatización de procesos', description: 'Elimina tareas repetitivas y reduce errores operacionales desde el primer día.' },
+      { icon: '📊', title: 'Reportes en tiempo real', description: 'Dashboards con métricas clave para tomar decisiones con datos, no intuiciones.' },
+      { icon: '🔗', title: 'Integraciones nativas', description: 'Conecta con las herramientas que ya usas sin código ni configuraciones complejas.' },
+      { icon: '🔒', title: 'Seguridad empresarial', description: 'Cifrado de datos, backups automáticos y cumplimiento de normativas de privacidad.' },
+      { icon: '📱', title: 'Acceso desde cualquier lugar', description: 'Web, iOS y Android. Tu equipo trabaja desde donde esté.' },
+      { icon: '🎯', title: 'Soporte dedicado', description: 'Asistencia técnica real con tiempo de respuesta garantizado, no solo bots.' },
+    ],
+    agency: [
+      { icon: '🎨', title: 'Diseño UX/UI', description: 'Interfaces que convierten visitantes en clientes. Diseño centrado en el usuario con base en datos.' },
+      { icon: '💻', title: 'Desarrollo Web y Mobile', description: 'Aplicaciones web y móviles robustas, escalables y con arquitectura moderna.' },
+      { icon: '🤖', title: 'Inteligencia Artificial', description: 'Automatización inteligente, chatbots y análisis de datos para escalar tu operación.' },
+      { icon: '📈', title: 'Marketing Digital', description: 'Estrategias SEO, SEM y contenido con métricas claras y resultados medibles.' },
+      { icon: '🛒', title: 'eCommerce', description: 'Tiendas online de alto rendimiento con pasarelas de pago y gestión de inventario.' },
+      { icon: '⚙️', title: 'ERP & CRM', description: 'Implementación y personalización de sistemas de gestión empresarial.' },
+    ],
+    industrial: [
+      { icon: '⚡', title: 'Transformadores de Potencia', description: 'Transformadores de distribución y potencia para proyectos industriales, mineros y de infraestructura.' },
+      { icon: '🔌', title: 'Sub Estaciones Eléctricas', description: 'Diseño y construcción de sub-estaciones eléctricas completas, desde la ingeniería hasta la puesta en marcha.' },
+      { icon: '🏭', title: 'Tableros Eléctricos', description: 'Tableros de distribución, control y protección para cualquier capacidad y aplicación industrial.' },
+      { icon: '🔧', title: 'Ducto de Barras', description: 'Sistemas de distribución de energía por ducto de barras blindado para plantas industriales.' },
+      { icon: '📊', title: 'Filtros Activos de Armónicos', description: 'Soluciones de calidad de energía para reducir distorsión armónica y mejorar la eficiencia eléctrica.' },
+      { icon: '✅', title: 'Mantenimiento y Servicio Técnico', description: 'Contratos de mantenimiento preventivo y correctivo con respuesta técnica especializada.' },
+    ],
+    general: [
+      { icon: '✅', title: 'Calidad garantizada', description: 'Todos nuestros productos y servicios cumplen con los más altos estándares de calidad.' },
+      { icon: '⚡', title: 'Respuesta rápida', description: 'Atención oportuna y soluciones ágiles. Respetamos los plazos acordados.' },
+      { icon: '🤝', title: 'Servicio personalizado', description: 'Entendemos las necesidades específicas de cada cliente y ofrecemos soluciones a medida.' },
+      { icon: '🔒', title: 'Confianza y seguridad', description: 'Años de experiencia respaldan nuestra reputación en el mercado.' },
+      { icon: '💡', title: 'Innovación constante', description: 'Nos actualizamos continuamente para ofrecer las mejores soluciones del mercado.' },
+      { icon: '📊', title: 'Resultados medibles', description: 'Definimos métricas claras y reportamos resultados concretos en cada proyecto.' },
+    ],
+  };
+  return defaults[industry] || defaults.general;
 }
 
-function buildFAQ() {
-  return [
-    { q: '¿Cuánto tarda en arrancar un proyecto?', a: 'La mayoría de proyectos comienzan dentro de los 5-7 días hábiles de aprobado el brief. Para staffing, presentamos candidatos en 48-72h.' },
-    { q: '¿Trabajan con empresas fuera de Perú?', a: 'Sí. Trabajamos con empresas en toda LatAm y USA. Nuestros especialistas operan en múltiples zonas horarias.' },
-    { q: '¿Cómo manejan la confidencialidad?', a: 'Firmamos NDA antes de cualquier conversación técnica. Todos nuestros colaboradores están sujetos a acuerdos de confidencialidad.' },
-    { q: '¿Puedo escalar o reducir el equipo?', a: 'Sí. Nuestro modelo TaaS te permite ajustar el tamaño del equipo mes a mes según tus necesidades de negocio.' },
-  ];
+// ─── Hero stats — from impact_numbers or industry defaults ───────────────────
+function buildHeroStats(analysis) {
+  const { industry, business } = extractClientInfo(analysis);
+
+  if (business.impact_numbers?.length >= 2) {
+    return business.impact_numbers.slice(0, 4).map(n => ({ number: n.value, label: n.label }));
+  }
+
+  const defaults = {
+    elevator_company: [
+      { number: '20+', label: 'Años de experiencia' },
+      { number: '500+', label: 'Instalaciones completadas' },
+      { number: '98%', label: 'Clientes satisfechos' },
+      { number: '24h', label: 'Tiempo de respuesta' },
+    ],
+    saas: [
+      { number: '10k+', label: 'Usuarios activos' },
+      { number: '99.9%', label: 'Uptime garantizado' },
+      { number: '70%', label: 'Reducción de trabajo manual' },
+      { number: '14 días', label: 'Prueba gratis' },
+    ],
+    agency: [
+      { number: '100+', label: 'Proyectos entregados' },
+      { number: '8+', label: 'Años de experiencia' },
+      { number: '50+', label: 'Clientes activos' },
+      { number: '48h', label: 'Tiempo de respuesta' },
+    ],
+    industrial: [
+      { number: '25+', label: 'Años de experiencia' },
+      { number: '300+', label: 'Proyectos ejecutados' },
+      { number: '100%', label: 'Entregas certificadas' },
+      { number: '24h', label: 'Soporte técnico' },
+    ],
+    general: [
+      { number: '10+', label: 'Años de trayectoria' },
+      { number: '200+', label: 'Clientes atendidos' },
+      { number: '98%', label: 'Satisfacción' },
+      { number: '24h', label: 'Soporte' },
+    ],
+  };
+  return defaults[industry] || defaults.general;
+}
+
+// ─── Hero badge text ──────────────────────────────────────────────────────────
+function buildHeroBadge(analysis) {
+  const { industry, business } = extractClientInfo(analysis);
+  const first = business.impact_numbers?.[0];
+  if (first) return `${first.value} ${first.label.toLowerCase()} ✓`;
+  const badges = {
+    elevator_company: 'Instalaciones certificadas con garantía técnica',
+    industrial:       'Equipos certificados con respaldo técnico especializado',
+    saas:             'Prueba gratis 14 días — sin tarjeta de crédito',
+    agency:           'Proyectos entregados con resultados medibles',
+    fintech:          'Seguro, regulado y sin comisiones ocultas',
+    general:          'Calidad y confianza en cada proyecto',
+  };
+  return badges[industry] || badges.general;
+}
+
+// ─── Process steps — industry-specific ──────────────────────────────────────
+function buildClientProcess(analysis) {
+  const { industry, companyName } = extractClientInfo(analysis);
+  const defaults = {
+    elevator_company: [
+      { n: '01', title: 'Consultoría técnica', desc: 'Evaluamos tu proyecto y recomendamos la solución ideal de elevación según el tipo de inmueble, tráfico esperado y normativas locales.' },
+      { n: '02', title: 'Diseño e instalación', desc: 'Nuestro equipo técnico certificado instala el sistema cumpliendo todas las normativas de seguridad vigentes, con mínima interferencia en la obra.' },
+      { n: '03', title: 'Mantenimiento y garantía', desc: 'Soporte post-instalación con contratos de mantenimiento preventivo y correctivo. Garantía en equipos y repuestos originales.' },
+    ],
+    saas: [
+      { n: '01', title: 'Configuración express', desc: 'Crea tu cuenta y conecta tus herramientas actuales en menos de 30 minutos. Sin instalaciones.' },
+      { n: '02', title: 'Onboarding guiado', desc: 'Tu equipo aprende a usar la plataforma con tutoriales interactivos y soporte en vivo.' },
+      { n: '03', title: 'Optimiza y escala', desc: 'Analiza tus métricas, automatiza más procesos y ajusta la plataforma según tu crecimiento.' },
+    ],
+    agency: [
+      { n: '01', title: 'Discovery y brief', desc: 'Entendemos tu negocio, competencia y objetivos. Definimos el alcance con métricas claras.' },
+      { n: '02', title: 'Diseño y desarrollo', desc: 'Entregas iterativas cada 2 semanas con demos. Tú validas antes de continuar.' },
+      { n: '03', title: 'Lanzamiento y soporte', desc: 'Deploy con monitoreo. Soporte post-lanzamiento incluido los primeros 30 días.' },
+    ],
+    industrial: [
+      { n: '01', title: 'Ingeniería y consultoría', desc: 'Evaluamos los requerimientos técnicos de tu proyecto y diseñamos la solución óptima con ingeniería especializada.' },
+      { n: '02', title: 'Fabricación y suministro', desc: 'Producción o suministro de equipos certificados según especificaciones técnicas. Control de calidad en cada etapa.' },
+      { n: '03', title: 'Instalación y puesta en marcha', desc: 'Nuestro equipo técnico realiza la instalación, pruebas y comisionamiento con todos los protocolos de seguridad.' },
+    ],
+    general: [
+      { n: '01', title: 'Consulta inicial', desc: 'Nos contás tu necesidad y evaluamos la mejor solución para tu caso específico.' },
+      { n: '02', title: 'Propuesta a medida', desc: 'Presentamos propuesta detallada con alcance, tiempos y costos claros. Sin sorpresas.' },
+      { n: '03', title: 'Entrega y seguimiento', desc: 'Ejecutamos con compromiso y hacemos seguimiento hasta tu completa satisfacción.' },
+    ],
+  };
+  return defaults[industry] || defaults.general;
+}
+
+// ─── Testimonials — from scraped data or industry defaults (NO GrowBy clients) ─
+function buildClientTestimonials(analysis) {
+  const { industry, business } = extractClientInfo(analysis);
+
+  if (business.testimonials?.length >= 2) {
+    return business.testimonials.slice(0, 3);
+  }
+
+  const defaults = {
+    elevator_company: [
+      { name: 'Roberto Sánchez', role: 'Gerente de Proyectos', company: 'Constructora Andina', text: 'La instalación fue impecable y cumplieron con los tiempos prometidos. El equipo técnico siempre disponible para resolver cualquier consulta.', rating: 5 },
+      { name: 'Carmen Torres', role: 'Administradora', company: 'Edificio San Martín', text: 'Llevamos 3 años con su servicio de mantenimiento y jamás hemos tenido problemas. Totalmente confiables y profesionales.', rating: 5 },
+      { name: 'Miguel Flores', role: 'Director de Operaciones', company: 'Centro Comercial Norte', text: 'Instalaron múltiples elevadores en nuestro centro comercial. Profesionalismo y calidad en cada detalle del proyecto.', rating: 5 },
+    ],
+    saas: [
+      { name: 'Ana García', role: 'COO', company: 'Distribuidora Regional', text: 'Redujimos el tiempo de reporte semanal de 4 horas a 20 minutos. La plataforma es intuitiva y el soporte responde muy rápido.', rating: 5 },
+      { name: 'Carlos Ríos', role: 'Gerente de Operaciones', company: 'Grupo Retail SA', text: 'Automatizamos 3 procesos críticos en el primer mes. El ROI se ve desde las primeras semanas de uso.', rating: 5 },
+      { name: 'Laura Méndez', role: 'Directora de TI', company: 'Servicios Integrados', text: 'La integración con nuestras herramientas actuales fue sencilla. El equipo de soporte nos acompañó en cada paso.', rating: 5 },
+    ],
+    industrial: [
+      { name: 'Héctor Ramírez', role: 'Gerente de Planta', company: 'Minera Pacífico', text: 'Los transformadores instalados llevan 4 años operando sin incidentes. Soporte técnico siempre disponible y piezas en stock.', rating: 5 },
+      { name: 'Claudia Vera', role: 'Directora de Proyectos', company: 'Constructora NorAndina', text: 'Cumplieron con los plazos de entrega y la calidad de los tableros eléctricos superó las especificaciones del proyecto.', rating: 5 },
+      { name: 'Rodrigo Espinoza', role: 'Jefe de Mantenimiento', company: 'Planta Industrial Sur', text: 'Excelente respaldo técnico post-venta. El equipo de ingeniería siempre disponible para resolver cualquier consulta.', rating: 5 },
+    ],
+    general: [
+      { name: 'Jorge Palomino', role: 'Director General', company: 'Empresa Alpha', text: 'Profesionalismo y resultados concretos desde el primer día. Superaron nuestras expectativas en tiempo y calidad.', rating: 5 },
+      { name: 'Sofía Castro', role: 'Gerente Comercial', company: 'Empresa Beta', text: 'El equipo entiende nuestro negocio y propone soluciones reales. Comunicación clara y entregables puntuales.', rating: 5 },
+      { name: 'Andrés Vidal', role: 'CEO', company: 'Empresa Gamma', text: 'Excelente relación calidad-precio. Recomendamos sus servicios a cualquier empresa que busque resultados.', rating: 5 },
+    ],
+  };
+  return defaults[industry] || defaults.general;
+}
+
+// ─── FAQ — industry-specific, NO GrowBy content ──────────────────────────────
+function buildClientFAQ(analysis) {
+  const { industry, companyName } = extractClientInfo(analysis);
+  const defaults = {
+    elevator_company: [
+      { q: '¿Cuánto tiempo tarda la instalación de un elevador?', a: 'El tiempo varía según el tipo de proyecto. Para instalaciones residenciales, entre 2 y 4 semanas. Para proyectos comerciales o industriales, entre 4 y 8 semanas. Especificamos el cronograma exacto en la propuesta.' },
+      { q: '¿Qué normativas de seguridad cumplen?', a: 'Todos nuestros equipos cumplen con las normativas nacionales vigentes y estándares internacionales (EN 81, ASME A17.1). Nuestros técnicos están certificados y actualizados.' },
+      { q: '¿Ofrecen servicio de mantenimiento post-instalación?', a: 'Sí, contamos con contratos de mantenimiento preventivo y correctivo, revisiones periódicas, repuestos originales y atención de emergencias con tiempo de respuesta garantizado.' },
+      { q: '¿Trabajan con edificios ya construidos?', a: 'Sí. Tenemos soluciones para obras nuevas y retrofitting (instalación en edificios existentes). Evaluamos las condiciones del inmueble y proponemos la solución técnica más adecuada.' },
+    ],
+    saas: [
+      { q: '¿Cuánto tiempo toma implementar la plataforma?', a: 'La mayoría de empresas están operativas en menos de una semana. La configuración básica toma 30 minutos y ofrecemos onboarding guiado sin costo.' },
+      { q: '¿Mis datos están seguros?', a: 'Sí. Utilizamos cifrado de extremo a extremo, backups automáticos diarios y servidores certificados ISO 27001. Tus datos nunca se comparten con terceros.' },
+      { q: '¿Puedo cancelar cuando quiera?', a: 'Sí, sin penalidades ni períodos mínimos. Puedes cancelar tu suscripción en cualquier momento desde tu panel de administración.' },
+      { q: '¿Tienen soporte técnico en español?', a: 'Sí, nuestro equipo de soporte atiende en español de lunes a viernes de 9am a 7pm, con ticket de emergencia disponible 24/7.' },
+    ],
+    industrial: [
+      { q: '¿Cuáles son los plazos de entrega típicos?', a: 'Depende de la capacidad y especificación del equipo. Transformadores estándar: 4-8 semanas. Equipos especiales o de alta potencia: 12-20 semanas. Detallamos tiempos exactos en cada cotización.' },
+      { q: '¿Qué normas y certificaciones cumplen sus equipos?', a: 'Nuestros equipos cumplen con normas IEC, IEEE, ANSI y normativas locales vigentes. Cada equipo se entrega con certificado de pruebas de fábrica y documentación técnica completa.' },
+      { q: '¿Ofrecen instalación y puesta en marcha?', a: 'Sí, contamos con equipo técnico especializado para instalación, pruebas de aceptación en sitio (SAT) y puesta en marcha. También ofrecemos capacitación al personal de operación.' },
+      { q: '¿Tienen repuestos disponibles?', a: 'Mantenemos inventario de repuestos críticos para los equipos que suministramos. Ofrecemos contratos de mantenimiento que incluyen repuestos y tiempo de respuesta garantizado.' },
+    ],
+    general: [
+      { q: '¿Cómo puedo solicitar una cotización?', a: 'Contáctanos a través de nuestro formulario, correo o teléfono. Respondemos con una propuesta en menos de 24 horas hábiles.' },
+      { q: '¿Cuáles son sus horarios de atención?', a: 'Atendemos de lunes a viernes de 9am a 6pm. Para urgencias contamos con canal de atención especial.' },
+      { q: '¿Ofrecen garantía en sus servicios?', a: 'Sí, todos nuestros servicios y productos cuentan con garantía. Los términos específicos se detallan en la propuesta comercial.' },
+      { q: '¿Tienen cobertura a nivel nacional?', a: 'Sí, trabajamos en las principales ciudades del país. Contáctanos para verificar cobertura en tu zona.' },
+    ],
+  };
+  return defaults[industry] || defaults.general;
+}
+
+// ─── Client logos section label ───────────────────────────────────────────────
+function buildClientLogosLabel(analysis) {
+  const { companyName } = extractClientInfo(analysis);
+  return `Empresas que confían en ${companyName}`;
+}
+
+// ─── Header nav — dynamic per industry ───────────────────────────────────────
+function buildHeaderNav(analysis) {
+  const { industry, business } = extractClientInfo(analysis);
+  if (business.nav_items?.length >= 3) {
+    return business.nav_items.slice(0, 4);
+  }
+  const navDefaults = {
+    elevator_company: ['Productos', 'Instalación', 'Mantenimiento', 'Contacto'],
+    industrial:       ['Productos', 'Proyectos', 'Servicios Técnicos', 'Contacto'],
+    saas:             ['Producto', 'Precios', 'Casos de éxito', 'Contacto'],
+    agency:           ['Servicios', 'Proyectos', 'Equipo', 'Contacto'],
+    fintech:          ['Cómo funciona', 'Planes', 'Seguridad', 'Contacto'],
+    general:          ['Servicios', 'Nosotros', 'Proyectos', 'Contacto'],
+  };
+  return navDefaults[industry] || navDefaults.general;
+}
+
+// ─── CTA section content ─────────────────────────────────────────────────────
+function buildCTAContent(analysis) {
+  const { industry, companyName, business } = extractClientInfo(analysis);
+  const copy = analysis.seo_copy_analysis?.rewritten_copy || {};
+  const contactEmail = business.contact_email || '#contacto';
+  const isEmail = contactEmail !== '#contacto';
+
+  const templates = {
+    elevator_company: {
+      h2: 'Solicita tu cotización sin costo',
+      body: 'Cuéntanos tu proyecto y te enviamos una propuesta técnica detallada. Nuestros especialistas evalúan tu inmueble y recomiendan la solución ideal.',
+      btn: copy.ctas?.primary || 'Solicitar cotización →',
+      micro: 'Respuesta en menos de 24 horas · Sin compromiso',
+    },
+    saas: {
+      h2: 'Empieza tu prueba gratuita hoy',
+      body: 'Sin tarjeta de crédito. Sin instalaciones. En menos de 5 minutos tu equipo tiene acceso a todas las funciones.',
+      btn: copy.ctas?.primary || 'Empieza gratis →',
+      micro: '14 días gratis · Cancela cuando quieras',
+    },
+    agency: {
+      h2: 'Cuéntanos tu proyecto',
+      body: 'Desde el brief hasta el lanzamiento, te acompañamos con un equipo dedicado y resultados medibles en cada entrega.',
+      btn: copy.ctas?.primary || 'Iniciar proyecto →',
+      micro: 'Respondemos en menos de 24 horas',
+    },
+    industrial: {
+      h2: 'Solicita tu cotización técnica',
+      body: 'Cuéntanos los requerimientos de tu proyecto y nuestro equipo de ingeniería te enviará una propuesta técnica detallada con plazos y especificaciones.',
+      btn: copy.ctas?.primary || 'Solicitar cotización →',
+      micro: 'Respuesta técnica en menos de 24 horas · Sin compromiso',
+    },
+    general: {
+      h2: 'Comencemos hoy',
+      body: `Contáctanos y te ayudamos a encontrar la mejor solución para tu proyecto. Sin compromiso.`,
+      btn: copy.ctas?.primary || 'Contáctanos →',
+      micro: 'Respuesta en menos de 24 horas · Sin compromiso',
+    },
+  };
+
+  const t = templates[industry] || templates.general;
+  return { ...t, contact: contactEmail, isEmail };
+}
+
+// ─── Footer data ──────────────────────────────────────────────────────────────
+function buildFooterData(analysis) {
+  const { industry, companyName, business } = extractClientInfo(analysis);
+  const year = new Date().getFullYear();
+
+  const navCols = {
+    elevator_company: [
+      { title: 'Productos', links: ['Elevadores Residenciales', 'Elevadores Comerciales', 'Montacargas', 'Escaleras Mecánicas'] },
+      { title: 'Servicios', links: ['Instalación', 'Mantenimiento', 'Modernización', 'Consultoría Técnica'] },
+      { title: 'Empresa', links: ['Nosotros', 'Certificaciones', 'Proyectos', 'Contacto'] },
+    ],
+    industrial: [
+      { title: 'Productos', links: ['Transformadores', 'Sub Estaciones', 'Tableros Eléctricos', 'Ducto de Barras'] },
+      { title: 'Servicios', links: ['Ingeniería', 'Instalación', 'Mantenimiento', 'Consultoría Técnica'] },
+      { title: 'Empresa', links: ['Nosotros', 'Certificaciones', 'Proyectos', 'Contacto'] },
+    ],
+    saas: [
+      { title: 'Producto', links: ['Funcionalidades', 'Integraciones', 'Seguridad', 'Precios'] },
+      { title: 'Empresa', links: ['Sobre nosotros', 'Blog', 'Casos de éxito', 'Carreras'] },
+      { title: 'Soporte', links: ['Documentación', 'Centro de ayuda', 'Estado del sistema', 'Contacto'] },
+    ],
+    agency: [
+      { title: 'Servicios', links: ['Diseño UX/UI', 'Desarrollo Web', 'Móvil & Apps', 'IA & Automatización'] },
+      { title: 'Empresa', links: ['Nosotros', 'Equipo', 'Blog', 'Casos de éxito'] },
+      { title: 'Contacto', links: [business.contact_email || 'Escríbenos', business.contact_phone || 'Llámanos', 'Ubicación'] },
+    ],
+    general: [
+      { title: 'Servicios', links: ['Servicio 1', 'Servicio 2', 'Servicio 3', 'Más servicios'] },
+      { title: 'Empresa', links: ['Nosotros', 'Equipo', 'Proyectos', 'Contacto'] },
+      { title: 'Contacto', links: [business.contact_email || 'Contáctenos', business.contact_phone || '', 'Ubicación'] },
+    ],
+  };
+
+  return {
+    companyName,
+    navCols: navCols[industry] || navCols.general,
+    copyright: `© ${year} ${companyName}. Todos los derechos reservados.`,
+    tagline: {
+      elevator_company: 'Soluciones de movilidad vertical con respaldo técnico certificado.',
+      industrial: 'Equipos eléctricos e industriales con ingeniería especializada y soporte técnico.',
+      general: 'Calidad y compromiso en cada proyecto.',
+    }[industry] || 'Soluciones especializadas para tu empresa.',
+  };
 }
 
 // Build the complete JSX component as a string
 function buildJSXComponent(analysis, geminiImages, ds, assets) {
   const copy = analysis.seo_copy_analysis?.rewritten_copy || {};
-  const features = buildGrowByFeatures(analysis);
-  const testimonials = buildTestimonials();
-  const faq = buildFAQ();
+  const { industry, companyName } = extractClientInfo(analysis);
+  const features = buildClientFeatures(analysis);
+  const heroStats = buildHeroStats(analysis);
+  const heroBadge = buildHeroBadge(analysis);
+  const processSteps = buildClientProcess(analysis);
+  const testimonials = buildClientTestimonials(analysis);
+  const faq = buildClientFAQ(analysis);
+  const clientLogosLabel = buildClientLogosLabel(analysis);
+  const headerNav = buildHeaderNav(analysis);
+  const ctaContent = buildCTAContent(analysis);
+  const footerData = buildFooterData(analysis);
   const colors = ds.colors;
   const fonts = ds.fonts;
   const br = ds.borderRadius;
@@ -252,12 +572,12 @@ function Header() {
                          background: \\\`linear-gradient(135deg, \\\${DS.primary}, \\\${DS.secondary})\\\`,
                          display: 'flex', alignItems: 'center', justifyContent: 'center',
                          color: '#fff', fontWeight: 800, fontSize: '1rem',
-                         fontFamily: DS.headingFont }}>G</span>`}
+                         fontFamily: DS.headingFont }}>${companyName.slice(0,1)}</span>`}
           ${logoImgTag ? '' : `<span style={{ fontFamily: DS.headingFont, fontWeight: 700, fontSize: '1.2rem',
-                         color: scrolled ? DS.dark : '#fff' }}>GrowBy</span>`}
+                         color: scrolled ? DS.dark : '#fff' }}>${companyName}</span>`}
         </a>
         <nav style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-          {['Servicios', 'Proyectos', 'Equipo', 'Blog'].map(item => (
+          {${JSON.stringify(headerNav)}.map(item => (
             <a key={item} href="#" style={{
               fontFamily: DS.bodyFont, fontSize: '0.9rem', fontWeight: 500,
               color: scrolled ? DS.mid : 'rgba(255,255,255,0.85)',
@@ -277,7 +597,7 @@ function Header() {
           }}
             onMouseEnter={e => { e.target.style.transform = 'scale(1.04)'; e.target.style.boxShadow = \`0 8px 24px \${DS.primary}55\`; }}
             onMouseLeave={e => { e.target.style.transform = 'scale(1)'; e.target.style.boxShadow = \`0 4px 16px \${DS.primary}44\`; }}>
-            Cuéntanos tu proyecto
+            ${ctaContent.btn.replace(' →', '')}
           </a>
         </nav>
       </div>
@@ -311,7 +631,7 @@ function HeroSection() {
                         padding: '6px 16px', marginBottom: '24px', animation: 'fadeInUp 0.5s ease forwards' }}>
             <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.9)', fontWeight: 600,
                            letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: DS.bodyFont }}>
-              Más de 250 proyectos entregados en LatAm 🚀
+              ${heroBadge}
             </span>
           </div>
           <h1 style={{ fontFamily: DS.headingFont, fontWeight: 800, fontSize: 'clamp(2.25rem,5vw,3.75rem)',
@@ -357,12 +677,7 @@ function HeroSection() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', animation: 'fadeInUp 0.8s ease 0.25s both' }}>
-          {[
-            { number: '250+', label: 'Proyectos entregados' },
-            { number: '100K+', label: 'Especialistas en red' },
-            { number: '6', label: 'Años de experiencia' },
-            { number: '98%', label: 'Clientes satisfechos' },
-          ].map((stat, i) => (
+          {${JSON.stringify(heroStats)}.map((stat, i) => (
             <div key={i} style={{
               background: 'rgba(255,255,255,0.1)',
               backdropFilter: 'blur(8px)',
@@ -400,7 +715,7 @@ function ClientLogos() {
         <p style={{ textAlign: 'center', fontFamily: DS.bodyFont, fontSize: '0.85rem',
                     fontWeight: 600, color: DS.mid, textTransform: 'uppercase',
                     letterSpacing: '0.1em', marginBottom: '32px', padding: '0 24px' }}>
-          Empresas líderes que confían en GrowBy
+          ${clientLogosLabel}
         </p>
       </FadeIn>
       <div style={{ overflow: 'hidden', position: 'relative' }}>
@@ -439,7 +754,7 @@ function ClientLogos() {
 
 // ─── FEATURES ────────────────────────────────────────────────────────────────
 function FeaturesSection() {
-  const features = ${JSON.stringify(buildGrowByFeatures(analysis))};
+  const features = ${JSON.stringify(features)};
 
   return (
     <section id="servicios" style={{ background: DS.bg, padding: '96px 24px' }}>
@@ -488,11 +803,7 @@ function FeaturesSection() {
 
 // ─── PROCESS ─────────────────────────────────────────────────────────────────
 function ProcessSection() {
-  const steps = [
-    { n: '01', title: 'Brief & Discovery', desc: 'En 24h agendamos una llamada para entender tu proyecto, equipo actual y objetivos de negocio.' },
-    { n: '02', title: 'Propuesta & Equipo', desc: 'En 48-72h presentamos la propuesta técnica con el equipo seleccionado y cronograma de entrega.' },
-    { n: '03', title: 'Sprint & Entrega', desc: 'Trabajamos en sprints de 2 semanas con demos continuas hasta lanzar tu producto.' },
-  ];
+  const steps = ${JSON.stringify(processSteps)};
 
   return (
     <section style={{ background: DS.surface, padding: '96px 24px' }}>
@@ -538,7 +849,7 @@ function ProcessSection() {
 
 // ─── TESTIMONIALS ────────────────────────────────────────────────────────────
 function TestimonialsSection() {
-  const testimonials = ${JSON.stringify(buildTestimonials())};
+  const testimonials = ${JSON.stringify(testimonials)};
 
   return (
     <section style={{ background: DS.bg, padding: '96px 24px' }}>
@@ -592,7 +903,7 @@ function TestimonialsSection() {
 // ─── FAQ ─────────────────────────────────────────────────────────────────────
 function FAQSection() {
   const [open, setOpen] = React.useState(null);
-  const faq = ${JSON.stringify(buildFAQ())};
+  const faq = ${JSON.stringify(faq)};
 
   return (
     <section style={{ background: DS.surface, padding: '96px 24px' }}>
@@ -649,13 +960,13 @@ function CTASection() {
           <h2 style={{ fontFamily: DS.headingFont, fontWeight: 800,
                        fontSize: 'clamp(2rem,5vw,3rem)', color: '#fff',
                        marginBottom: '20px', lineHeight: 1.15 }}>
-            Empieza hoy — sin riesgos
+            ${ctaContent.h2}
           </h2>
           <p style={{ fontFamily: DS.bodyFont, color: 'rgba(255,255,255,0.85)',
                       fontSize: '1.15rem', marginBottom: '40px', lineHeight: 1.7 }}>
-            Cuéntanos tu proyecto y en menos de 24 horas te contactamos con una propuesta personalizada.
+            ${ctaContent.body}
           </p>
-          <a href="mailto:kevin@growby.tech" style={{
+          <a href="mailto:${ctaContent.contact}" style={{
             display: 'inline-block', padding: '18px 48px',
             background: DS.accent, color: '#18181b',
             borderRadius: DS.brFull, fontFamily: DS.bodyFont,
@@ -663,11 +974,11 @@ function CTASection() {
             boxShadow: \`0 8px 40px \${DS.accent}55\`,
             animation: 'ctaPulse 3s ease-in-out infinite',
           }}>
-            Cuéntanos tu proyecto →
+            ${ctaContent.btn}
           </a>
           <p style={{ marginTop: '20px', fontFamily: DS.bodyFont,
                       color: 'rgba(255,255,255,0.65)', fontSize: '0.85rem' }}>
-            Sin compromiso · Respondemos en menos de 24h · kevin@growby.tech
+            Sin compromiso · Respondemos en menos de 24h · ${ctaContent.contact}
           </p>
         </FadeIn>
       </div>
@@ -685,24 +996,20 @@ function Footer() {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
               ${logoUrl
-                ? `<img src="${logoUrl}" alt="GrowBy" style={{ height: '36px', width: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />`
+                ? `<img src="${logoUrl}" alt="${companyName}" style={{ height: '36px', width: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />`
                 : `<span style={{ width: 36, height: 36, borderRadius: DS.brSm,
                              background: \\\`linear-gradient(135deg, \\\${DS.primary}, \\\${DS.secondary})\\\`,
                              display: 'flex', alignItems: 'center', justifyContent: 'center',
                              color: '#fff', fontWeight: 800, fontSize: '1rem',
-                             fontFamily: DS.headingFont }}>G</span>
-              <span style={{ fontFamily: DS.headingFont, fontWeight: 700, fontSize: '1.2rem', color: '#fff' }}>GrowBy</span>`
+                             fontFamily: DS.headingFont }}>${companyName.slice(0,1)}</span>
+              <span style={{ fontFamily: DS.headingFont, fontWeight: 700, fontSize: '1.2rem', color: '#fff' }}>${companyName}</span>`
               }
             </div>
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.875rem', lineHeight: 1.7 }}>
-              Hub de especialistas digitales. Fundado en Lima, Perú. Operamos en toda LatAm y USA.
+              ${footerData.tagline}
             </p>
           </div>
-          {[
-            { title: 'Servicios', links: ['Projects', 'Hiring', 'GrowBy AI', 'Staff Augmentation'] },
-            { title: 'Empresa', links: ['Sobre nosotros', 'Equipo', 'Blog', 'Casos de éxito'] },
-            { title: 'Contacto', links: ['kevin@growby.tech', '+51 994 440 840', 'Lima, Perú', 'growby.tech'] },
-          ].map((col, i) => (
+          {${JSON.stringify(footerData.navCols)}.map((col, i) => (
             <div key={i}>
               <h4 style={{ fontFamily: DS.headingFont, fontWeight: 700, fontSize: '0.9rem',
                            color: '#fff', marginBottom: '16px', textTransform: 'uppercase',
@@ -723,10 +1030,10 @@ function Footer() {
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                       flexWrap: 'wrap', gap: '12px' }}>
           <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.8rem' }}>
-            © 2026 Hub Negocios Creativos SAC · GrowBy · Lima, Perú
+            ${footerData.copyright}
           </p>
           <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.75rem' }}>
-            Rediseño generado por GrowBy Web Redesign Agent v0.3.1
+            Rediseño generado por GrowBy Web Redesign Agent
           </p>
         </div>
       </div>
@@ -763,7 +1070,8 @@ function hexToRgb(hex) {
 // REGLA 3: Build HTML wrapper with real Google Fonts if available
 function buildHTML(jsxComponent, analysis, ds, assets) {
   const copy = analysis.seo_copy_analysis?.rewritten_copy || {};
-  const metaTitle = copy.meta_title || analysis.scraping?.title || 'GrowBy — Agencia Digital';
+  const clientCompanyName = analysis.scraping?.business?.company_name || analysis.scraping?.brand?.name || 'Empresa';
+  const metaTitle = copy.meta_title || analysis.scraping?.title || `${clientCompanyName} — Sitio Web`;
   const metaDesc = copy.meta_description || analysis.scraping?.description || 'Especialistas digitales.';
   const colors = ds.colors;
 
@@ -882,6 +1190,16 @@ export async function generate(analysisPath) {
   console.log(`  ✓ redesign.jsx (${Math.round(jsxComponent.length / 1024)}KB)`);
 
   const html = buildHTML(jsxComponent, analysis, ds, assets);
+
+  // Anti-contamination check — the output must NOT contain GrowBy brand references
+  const contaminated = ['kevin@growby.tech', '+51 994 440 840', 'Hub Negocios Creativos', 'growby.tech', 'GrowBy AI', 'Staff Augmentation GrowBy']
+    .some(t => html.includes(t));
+  if (contaminated) {
+    console.warn('  ⚠️  ADVERTENCIA: HTML contiene referencias a GrowBy — revisar buildJSXComponent()');
+  } else {
+    console.log('  ✅ Anti-contaminación OK — sin referencias a GrowBy en el output');
+  }
+
   const htmlPath = path.join(outputDir, 'index.html');
   fs.writeFileSync(htmlPath, html);
   console.log(`  ✓ index.html (${Math.round(html.length / 1024)}KB)`);

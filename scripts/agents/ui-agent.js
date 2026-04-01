@@ -4,6 +4,44 @@
  */
 
 const DESIGN_SYSTEMS = {
+  elevator_company: {
+    visual_style: 'professional-technical',
+    palette: {
+      primary: '#1e3a5f',
+      primary_light: '#2d5a8e',
+      secondary: '#c8922a',
+      accent: '#e8a020',
+      neutral_dark: '#1a1a2e',
+      neutral_mid: '#4a5568',
+      neutral_light: '#f7f8fa',
+      background: '#ffffff',
+      surface: '#f8f9fb',
+      error: '#e53e3e',
+      success: '#38a169',
+    },
+    typography: {
+      heading_font: 'Montserrat',
+      heading_font_fallback: 'system-ui, sans-serif',
+      body_font: 'Inter',
+      heading_weights: [600, 700, 800],
+      body_weight: 400,
+      scale: { h1: '3rem', h2: '2.125rem', h3: '1.5rem', body: '1rem', small: '0.875rem' },
+    },
+    spacing_base: 8,
+    border_radius: { sm: '4px', md: '8px', lg: '12px', xl: '16px', full: '9999px' },
+    shadows: {
+      sm: '0 1px 3px rgba(0,0,0,0.06)',
+      md: '0 4px 12px rgba(0,0,0,0.08)',
+      lg: '0 12px 32px rgba(0,0,0,0.12)',
+    },
+    ui_recommendations: [
+      { priority: 1, element: 'Hero', issue: 'Sin imagen de instalación real de elevador', fix: 'Hero full-width con instalación en edificio moderno — genera confianza inmediata' },
+      { priority: 2, element: 'Tipos de producto', issue: 'Líneas de producto no diferenciadas', fix: 'Sección con cards: Residencial / Comercial / Industrial / Mantenimiento' },
+      { priority: 3, element: 'Trust signals', issue: 'Certificaciones no visibles', fix: 'Mostrar logos de certificaciones (ASME, EN 81) y años de experiencia above the fold' },
+      { priority: 4, element: 'CTA', issue: 'CTA genérico', fix: '"Solicita tu cotización" con respuesta en 24h — specifico a elevadores' },
+      { priority: 5, element: 'Proyectos', issue: 'Sin portafolio de instalaciones', fix: 'Grid de proyectos completados con edificio, tipo y año' },
+    ],
+  },
   fintech: {
     visual_style: 'corporate-trust',
     palette: {
@@ -156,6 +194,44 @@ const DESIGN_SYSTEMS = {
       { priority: 5, element: 'CTA', issue: 'Formulario de contacto genérico', fix: 'Reemplazar por "Cuéntanos tu proyecto" con estimado de tiempo de respuesta: "Respondemos en menos de 24h"' },
     ],
   },
+  industrial: {
+    visual_style: 'professional-technical',
+    palette: {
+      primary: '#1e3a5f',
+      primary_light: '#2d5a8e',
+      secondary: '#374151',
+      accent: '#f59e0b',
+      neutral_dark: '#111827',
+      neutral_mid: '#4b5563',
+      neutral_light: '#f3f4f6',
+      background: '#ffffff',
+      surface: '#f8f9fb',
+      error: '#ef4444',
+      success: '#10b981',
+    },
+    typography: {
+      heading_font: 'Montserrat',
+      heading_font_fallback: 'system-ui, sans-serif',
+      body_font: 'Inter',
+      heading_weights: [600, 700, 800],
+      body_weight: 400,
+      scale: { h1: '3rem', h2: '2.125rem', h3: '1.5rem', body: '1rem', small: '0.875rem' },
+    },
+    spacing_base: 8,
+    border_radius: { sm: '4px', md: '8px', lg: '12px', xl: '16px', full: '9999px' },
+    shadows: {
+      sm: '0 1px 3px rgba(0,0,0,0.06)',
+      md: '0 4px 12px rgba(0,0,0,0.08)',
+      lg: '0 12px 32px rgba(0,0,0,0.12)',
+    },
+    ui_recommendations: [
+      { priority: 1, element: 'Hero', issue: 'Sin imagen de equipos/instalaciones reales', fix: 'Hero full-width con equipos industriales en contexto — genera credibilidad técnica inmediata' },
+      { priority: 2, element: 'Productos/servicios', issue: 'Catálogo sin jerarquía visual', fix: 'Grid de categorías de productos con iconos técnicos y descripción corta' },
+      { priority: 3, element: 'Trust signals', issue: 'Certificaciones no visibles', fix: 'Mostrar logos de certificaciones y años de experiencia above the fold' },
+      { priority: 4, element: 'CTA', issue: 'CTA genérico', fix: '"Solicita cotización técnica" — específico al sector industrial B2B' },
+      { priority: 5, element: 'Contacto', issue: 'Formulario de contacto no especializado', fix: 'Formulario con campos técnicos: tipo de proyecto, capacidad requerida, plazo' },
+    ],
+  },
   general: {
     visual_style: 'modern-clean',
     palette: {
@@ -197,22 +273,40 @@ const DESIGN_SYSTEMS = {
 };
 
 export function runUIAgent(scrapingData) {
-  const { industria_detectada, metadata, markdown } = scrapingData;
+  const { industria_detectada, metadata, markdown, brand, assets } = scrapingData;
   const industry = industria_detectada || 'general';
+  const personality = brand?.personality || 'professional_technical';
 
-  console.log(`  🎨 [UI Agent] Generando design system para industria: ${industry}`);
+  console.log(`  🎨 [UI Agent] Industria: ${industry} · Personalidad: ${personality}`);
 
   const ds = DESIGN_SYSTEMS[industry] || DESIGN_SYSTEMS.general;
 
-  // Detect current tech issues from content
-  const hasNoFont = !markdown.toLowerCase().includes('font');
+  // Brand colors are SACRED — if detected from real site, override the design system palette
+  const palette = { ...ds.palette };
+  if (assets?.colors?.length > 0) {
+    const branded = assets.colors.filter(c => c && c.startsWith('#') && c.length === 7);
+    const isGrayish = hex => {
+      const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+      return (Math.max(r,g,b) - Math.min(r,g,b)) / Math.max(r,g,b) < 0.15;
+    };
+    const isLight = hex => {
+      const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+      return (r+g+b)/3 > 220;
+    };
+    const brandColors = branded.filter(c => !isGrayish(c) && !isLight(c));
+    if (brandColors[0]) { palette.primary = brandColors[0]; console.log(`  🎨 Color primario de marca: ${brandColors[0]}`); }
+    if (brandColors[1]) { palette.secondary = brandColors[1]; }
+    if (brandColors[2]) { palette.accent = brandColors[2]; }
+  }
+
   const hasBranding = metadata.title && metadata.title.length > 5;
 
   return {
     industria: industry,
+    personality,
     design_system: {
       visual_style: ds.visual_style,
-      palette: ds.palette,
+      palette,
       typography: ds.typography,
       spacing_base: ds.spacing_base,
       border_radius: ds.border_radius,
@@ -222,7 +316,7 @@ export function runUIAgent(scrapingData) {
     current_assessment: {
       has_title: hasBranding,
       detected_title: metadata.title,
-      note: hasNoFont ? 'No se detectó sistema de fuentes definido' : 'Sistema de fuentes presente',
+      brand_colors_applied: assets?.colors?.length > 0,
     },
   };
 }

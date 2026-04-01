@@ -4,6 +4,12 @@
  */
 
 const INDUSTRY_VISUAL_PROFILES = {
+  elevator_company: {
+    mood: 'professional, trustworthy, technical, reliable',
+    style: 'architectural photography, elevator installations in modern buildings, technical precision',
+    color_direction: 'navy blue and steel grey with gold accents, corporate but modern',
+    avoid: 'generic office photos, unrelated to vertical mobility, cheerful lifestyle shots',
+  },
   agency: {
     mood: 'professional, creative, collaborative, energetic',
     style: 'modern photography with editorial quality, clean backgrounds, authentic people',
@@ -34,6 +40,12 @@ const INDUSTRY_VISUAL_PROFILES = {
     color_direction: 'whites and light blues, green for health, calming tones',
     avoid: 'scary medical imagery, syringes, overly clinical sterile environments',
   },
+  industrial: {
+    mood: 'professional, technical, reliable, authoritative',
+    style: 'industrial photography, heavy equipment in operation, factory environments, technical precision',
+    color_direction: 'navy blue and steel grey, corporate and trustworthy',
+    avoid: 'generic office photos, lifestyle shots unrelated to industry, cartoon illustrations',
+  },
   general: {
     mood: 'professional, approachable, modern',
     style: 'diverse people in professional settings, clean environments',
@@ -53,7 +65,8 @@ function buildPrompt(section, industry, designSystem) {
       description: 'Main hero image above the fold',
       aspect_ratio: '16:9',
       composition: 'subject on right third, space on left for text overlay',
-      content: industry === 'agency' ? 'Diverse creative team collaborating around modern screens in a bright open-plan office, authentic candid moment' :
+      content: industry === 'elevator_company' ? 'Modern elevator installation in luxury residential building lobby, stainless steel doors open, architectural photography, warm professional lighting, ultra realistic' :
+               industry === 'agency' ? 'Diverse creative team collaborating around modern screens in a bright open-plan office, authentic candid moment' :
                industry === 'saas' ? 'Clean laptop/desktop showing modern dashboard UI with charts, placed on minimal desk, soft natural light from left' :
                industry === 'fintech' ? 'Abstract 3D flowing network of glowing nodes representing secure financial transactions, deep blue background' :
                'Professional person in modern environment, confident expression, natural lighting',
@@ -111,23 +124,47 @@ function buildPrompt(section, industry, designSystem) {
 }
 
 export function runVisualAgent(scrapingData, uiData) {
-  const { industria_detectada } = scrapingData;
+  const { industria_detectada, assets } = scrapingData;
   const industry = industria_detectada || 'general';
   const designSystem = uiData?.design_system || {};
+  const realImages = assets?.images || [];
 
-  console.log(`  🖼️  [Visual Agent] Generando prompts para industria: ${industry}`);
+  console.log(`  🖼️  [Visual Agent] Industria: ${industry} · Imágenes reales disponibles: ${realImages.length}`);
 
   const sections = ['hero_image', 'features_image', 'testimonial_bg', 'about_image', 'cta_bg', 'process_image', 'social_proof_bg'];
 
-  const prompts = sections.map(section => buildPrompt(section, industry, designSystem));
+  const prompts = sections.map((section, idx) => {
+    const base = buildPrompt(section, industry, designSystem);
+
+    // Real client images have ABSOLUTE PRIORITY — use them directly when available
+    const realImage = realImages[idx] || null;
+    if (realImage) {
+      return {
+        ...base,
+        real_image_url: realImage,
+        use_real: true,
+        note: 'Using real client image — skip AI generation for this section',
+      };
+    }
+
+    // Fallback: Pollinations.ai (free, no API key needed)
+    const encodedPrompt = encodeURIComponent(base.prompt);
+    const [w, h] = base.aspect_ratio === '16:9' ? [1280, 720] : base.aspect_ratio === '4:3' ? [1024, 768] : [1024, 1024];
+    return {
+      ...base,
+      pollinations_url: `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${w}&height=${h}&nologo=true`,
+      use_real: false,
+    };
+  });
 
   return {
     industry,
     image_prompts: prompts,
+    real_images_available: realImages.length,
     gemini_model: 'gemini-2.0-flash-exp',
     generation_config: {
       responseModalities: ['TEXT', 'IMAGE'],
-      note: 'Generate sequentially to respect rate limits (15 req/min on free tier)',
+      note: 'Real client images used first. Pollinations.ai as free fallback.',
     },
   };
 }

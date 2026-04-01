@@ -38,7 +38,7 @@ async function run(url) {
 
   console.log('\n╔══════════════════════════════════════════════════╗');
   console.log('║   GrowBy Web Redesign Agent — Pipeline Completo  ║');
-  console.log('║   v0.3.0 · Análisis + Generación + Deploy        ║');
+  console.log('║   v0.7.0 · Análisis + Generación + Deploy        ║');
   console.log('╚══════════════════════════════════════════════════╝\n');
   console.log(`🌐 URL objetivo: ${url}\n`);
 
@@ -52,7 +52,15 @@ async function run(url) {
   console.log('━━━ FASE 1: SCRAPING ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   const scrapingData = await scrape(url);
   const industry = scrapingData.industria_detectada;
-  console.log(`✓ Scraping completado — industria detectada: ${industry}`);
+  const companyName = scrapingData.business?.company_name || scrapingData.brand?.name || 'Empresa';
+
+  console.log(`\n  ✅ Páginas scrapeadas: ${scrapingData.pages_scraped || 1}`);
+  console.log(`  ✅ Industria detectada: ${industry}`);
+  console.log(`  ✅ Empresa: ${companyName}`);
+  console.log(`  ✅ Colores de marca: ${scrapingData.assets?.colors?.length ? scrapingData.assets.colors.slice(0,3).join(', ') : 'no detectados'}`);
+  console.log(`  ✅ Logo: ${scrapingData.assets?.logo_url ? scrapingData.assets.logo_url.slice(0,60) : 'no encontrado'}`);
+  console.log(`  ✅ Personalidad de marca: ${scrapingData.brand?.personality || 'general'}`);
+  console.log(`  ✅ Servicios detectados: ${scrapingData.business?.key_services?.length || 0}`);
 
   // ═══════════════════════════════════════════════════════
   // FASE 2: ANÁLISIS (4 agentes en paralelo)
@@ -76,14 +84,17 @@ async function run(url) {
       url,
       timestamp,
       industria: industry,
-      agent_version: 'v0.3.1',
+      agent_version: 'v0.7.0',
     },
     scraping: {
       source: scrapingData.source,
       title: scrapingData.metadata.title,
       description: scrapingData.metadata.description,
       markdown_length: scrapingData.markdown.length,
-      assets: scrapingData.assets || null,   // REGLA 1-4: real visual assets
+      assets: scrapingData.assets || null,           // REGLA 1-4: real visual assets
+      brand: scrapingData.brand || null,             // REGLA 2: brand identity
+      business: scrapingData.business || null,       // REGLA 1: company data
+      pages_scraped: scrapingData.pages_scraped || 1,
     },
     ui_analysis: uiResult,
     ux_analysis: uxResult,
@@ -150,6 +161,7 @@ async function run(url) {
   console.log('║   🎨 GrowBy Web Redesign Agent — Completado      ║');
   console.log('╚══════════════════════════════════════════════════╝');
   console.log(`\n🌐 URL analizada:    ${url}`);
+  console.log(`🏢 Empresa:          ${companyName}`);
   console.log(`🏭 Industria:        ${industry}`);
   console.log(`📡 Fuente scraping:  ${scrapingData.source}`);
 
