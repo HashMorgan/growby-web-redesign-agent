@@ -1,85 +1,91 @@
 import express from 'express';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { activeJobs } from '../app.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
+const OUTPUTS_DIR = path.join(PROJECT_ROOT, 'outputs');
+const EPISODIC_DIR = path.join(PROJECT_ROOT, 'memory', 'episodic');
 
-// Dynamic import of memory-manager
+// Dynamic import of memory-manager (optional)
 let memoryManager;
 async function getMemoryManager() {
   if (!memoryManager) {
-    memoryManager = await import(path.join(PROJECT_ROOT, 'scripts', 'memory-manager.js'));
+    try {
+      memoryManager = await import(path.join(PROJECT_ROOT, 'scripts', 'memory-manager.js'));
+    } catch { memoryManager = null; }
   }
   return memoryManager;
 }
 
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   const { jobId, score, feedback } = req.body;
 
-  if (!jobId) {
-    return res.status(400).json({
-      error: 'jobId es requerido'
-    });
+  if (!jobId || !score) {
+    return res.status(400).json({ error: 'jobId y score son requeridos' });
   }
 
-  if (score === undefined || score < 1 || score > 5) {
-    return res.status(400).json({
-      error: 'score debe estar entre 1 y 5'
-    });
+  const scoreNum = parseInt(score);
+  if (isNaN(scoreNum) || scoreNum < 1 || scoreNum > 5) {
+    return res.status(400).json({ error: 'score debe estar entre 1 y 5' });
   }
 
-  // Get job data
-  const jobData = activeJobs.get(jobId);
-  if (!jobData) {
-    return res.status(404).json({
-      error: 'Job no encontrado. Debe generar un rediseño primero.'
-    });
+  // Verify output exists — no activeJobs dependency (survives server restart)
+  const outputDir = path.join(OUTPUTS_DIR, jobId);
+  if (!fs.existsSync(outputDir)) {
+    return res.status(404).json({ error: `Output no encontrado: ${jobId}` });
   }
 
   try {
-    // Extract client slug from jobId (format: clientslug-timestamp)
-    const clientSlug = jobId.split('-').slice(0, -1).join('-');
-
-    // Load memory manager
-    const mm = await getMemoryManager();
-
-    // Prepare feedback data
-    const feedbackData = {
-      visual_score: score,
-      cambios_sugeridos: feedback || null,
-      copy_ok: score >= 4,
-      design_system_ok: score >= 4
+    // Save approval directly to output folder
+    const approval = {
+      jobId,
+      score: scoreNum,
+      feedback: feedback || null,
+      approved: true,
+      approved_at: new Date().toISOString()
     };
+    fs.writeFileSync(path.join(outputDir, 'approval.json'), JSON.stringify(approval, null, 2));
 
-    // Update feedback in episodic memory
-    const result = mm.processFeedback(clientSlug, feedbackData);
+    // Save to episodic memory
+    if (!fs.existsSync(EPISODIC_DIR)) fs.mkdirSync(EPISODIC_DIR, { recursive: true });
+    const episodicPath = path.join(EPISODIC_DIR, `${jobId}.json`);
+    const episodic = fs.existsSync(episodicPath)
+      ? JSON.parse(fs.readFileSync(episodicPath, 'utf8'))
+      : { jobId, created_at: new Date().toISOString() };
+    episodic.feedback = { score: scoreNum, feedback: feedback || null, approved_at: approval.approved_at };
+    fs.writeFileSync(episodicPath, JSON.stringify(episodic, null, 2));
 
-    if (result.error) {
-      return res.status(500).json({
-        error: result.error
-      });
+    // Try memory-manager for semantic pattern updates (non-critical)
+    let patternsUpdated = 0;
+    const mm = await getMemoryManager();
+    if (mm) {
+      try {
+        const clientSlug = jobId.replace(/-\d{4}-\d{2}-\d{2}$/, '');
+        const result = mm.processFeedback(clientSlug, {
+          visual_score: scoreNum,
+          cambios_sugeridos: feedback || null,
+          copy_ok: scoreNum >= 4,
+          design_system_ok: scoreNum >= 4
+        });
+        patternsUpdated = result?.patrones_actualizados?.length || 0;
+      } catch { /* non-critical */ }
     }
-
-    // Count patterns updated
-    const patternsUpdated = result.patrones_actualizados?.length || 0;
 
     res.json({
       success: true,
       patternsUpdated,
-      aprendizajes: result.aprendizajes || [],
       message: patternsUpdated > 0
-        ? `✅ Aprendizaje guardado. ${patternsUpdated} patrón(es) actualizado(s).`
-        : '✅ Feedback guardado en memoria episódica.'
+        ? `🧠 Aprendizaje guardado. ${patternsUpdated} patrón(es) actualizado(s).`
+        : '🧠 Feedback guardado en memoria episódica.'
     });
 
   } catch (error) {
     console.error('Error en approve:', error);
-    res.status(500).json({
-      error: error.message
-    });
+    res.status(500).json({ error: error.message });
   }
 });
 

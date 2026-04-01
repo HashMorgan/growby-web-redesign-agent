@@ -100,12 +100,16 @@ function mapDesignSystem(ds, assets) {
 }
 
 // REGLA 4: Get best available image for a section
-// Priority: 1) real site image, 2) Gemini generated, 3) null (gradient)
-function pickImage(siteImages, geminiImages, key, siteIndex = 0) {
-  // Try Gemini first if available (higher quality)
+// Priority: 1) Gemini, 2) section-specific real image, 3) any real site image, 4) Pollinations
+function pickImage(siteImages, geminiImages, key, siteIndex = 0, sectionImages = null, visualPrompts = null) {
   if (geminiImages[key]) return { src: `data:image/jpeg;base64,${geminiImages[key]}`, type: 'gemini' };
-  // Fall back to real site image
+  // Section-specific real image (highest quality match)
+  if (sectionImages?.[key]) return { src: sectionImages[key], type: 'real_section' };
+  // Any real site image by index
   if (siteImages && siteImages[siteIndex]) return { src: siteImages[siteIndex], type: 'real' };
+  // Pollinations.ai as free AI fallback
+  const vp = visualPrompts?.find(p => p.section === key);
+  if (vp?.pollinations_url) return { src: vp.pollinations_url, type: 'pollinations' };
   return null;
 }
 
@@ -122,29 +126,55 @@ function extractClientInfo(analysis) {
   return { industry, companyName, business: scrapingBusiness, brand: scrapingBrand };
 }
 
+// ─── SVG icons per industry — replaces generic emojis ────────────────────────
+function getIndustrySVGIcons(industry) {
+  const svgs = {
+    industrial: [
+      `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
+      `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>`,
+      `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>`,
+      `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><path d="M5 6h14M5 18h14"/></svg>`,
+      `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+      `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
+    ],
+    elevator_company: [
+      `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 7v4M9 10l3-3 3 3M12 17v-4M9 14l3 3 3-3"/></svg>`,
+      `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`,
+      `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`,
+      `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
+      `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+      `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+    ],
+  };
+  return svgs[industry] || null;
+}
+
 // ─── Client features — from scraped services or industry defaults ─────────────
 function buildClientFeatures(analysis) {
   const { industry, companyName, business } = extractClientInfo(analysis);
 
-  // Use scraped services if we have enough
-  if (business.key_services?.length >= 3) {
-    const icons = ['🏢','🔧','⚙️','✅','📐','🏗️','🔑','📊'];
-    return business.key_services.slice(0, 6).map((s, i) => ({
-      icon: icons[i % icons.length],
+  // Use scraped services if we have enough — use ALL services, not just first 3
+  if (business.key_services?.length >= 2) {
+    const svgIcons = getIndustrySVGIcons(industry);
+    const fallbackIcons = ['🏢','🔧','⚙️','✅','📐','🏗️','🔑','📊'];
+    return business.key_services.slice(0, 8).map((s, i) => ({
+      icon: svgIcons ? svgIcons[i % svgIcons.length] : fallbackIcons[i % fallbackIcons.length],
       title: s.name,
       description: s.description || s.name,
+      useSvg: !!svgIcons,
     }));
   }
 
-  // Industry-specific defaults — NO GrowBy content
+  // Industry-specific defaults — NO GrowBy content, with SVG icons for industrial/elevator
+  const svgIcons = getIndustrySVGIcons(industry);
   const defaults = {
     elevator_company: [
-      { icon: '🏢', title: 'Elevadores Residenciales', description: 'Soluciones de movilidad vertical para edificios residenciales y condominios. Diseño personalizado, instalación y garantía.' },
-      { icon: '🏗️', title: 'Elevadores Comerciales', description: 'Sistemas de transporte vertical para centros comerciales, oficinas y proyectos corporativos de alto tráfico.' },
-      { icon: '🏭', title: 'Elevadores Industriales', description: 'Montacargas y plataformas de carga para almacenes, plantas industriales y centros de distribución.' },
-      { icon: '🔧', title: 'Mantenimiento y Soporte', description: 'Contratos de mantenimiento preventivo y correctivo. Respuesta técnica rápida y piezas de repuesto originales.' },
-      { icon: '✅', title: 'Certificaciones y Garantía', description: 'Cumplimiento de normativas nacionales e internacionales (EN 81, ASME A17.1). Garantía en todos los equipos instalados.' },
-      { icon: '📐', title: 'Consultoría Técnica', description: 'Asesoría desde el diseño del proyecto hasta la puesta en marcha. Soluciones a medida para cada inmueble.' },
+      { icon: svgIcons?.[0] || '🏢', useSvg: !!svgIcons, title: 'Elevadores Residenciales', description: 'Soluciones de movilidad vertical para edificios residenciales y condominios. Diseño personalizado, instalación y garantía.' },
+      { icon: svgIcons?.[1] || '🏗️', useSvg: !!svgIcons, title: 'Elevadores Comerciales', description: 'Sistemas de transporte vertical para centros comerciales, oficinas y proyectos corporativos de alto tráfico.' },
+      { icon: svgIcons?.[2] || '🏭', useSvg: !!svgIcons, title: 'Elevadores Industriales', description: 'Montacargas y plataformas de carga para almacenes, plantas industriales y centros de distribución.' },
+      { icon: svgIcons?.[3] || '🔧', useSvg: !!svgIcons, title: 'Mantenimiento y Soporte', description: 'Contratos de mantenimiento preventivo y correctivo. Respuesta técnica rápida y piezas de repuesto originales.' },
+      { icon: svgIcons?.[4] || '✅', useSvg: !!svgIcons, title: 'Certificaciones y Garantía', description: 'Cumplimiento de normativas (EN 81, ASME A17.1). Garantía en todos los equipos instalados.' },
+      { icon: svgIcons?.[5] || '📐', useSvg: !!svgIcons, title: 'Consultoría Técnica', description: 'Asesoría desde el diseño del proyecto hasta la puesta en marcha. Soluciones a medida para cada inmueble.' },
     ],
     saas: [
       { icon: '⚡', title: 'Automatización de procesos', description: 'Elimina tareas repetitivas y reduce errores operacionales desde el primer día.' },
@@ -163,12 +193,12 @@ function buildClientFeatures(analysis) {
       { icon: '⚙️', title: 'ERP & CRM', description: 'Implementación y personalización de sistemas de gestión empresarial.' },
     ],
     industrial: [
-      { icon: '⚡', title: 'Transformadores de Potencia', description: 'Transformadores de distribución y potencia para proyectos industriales, mineros y de infraestructura.' },
-      { icon: '🔌', title: 'Sub Estaciones Eléctricas', description: 'Diseño y construcción de sub-estaciones eléctricas completas, desde la ingeniería hasta la puesta en marcha.' },
-      { icon: '🏭', title: 'Tableros Eléctricos', description: 'Tableros de distribución, control y protección para cualquier capacidad y aplicación industrial.' },
-      { icon: '🔧', title: 'Ducto de Barras', description: 'Sistemas de distribución de energía por ducto de barras blindado para plantas industriales.' },
-      { icon: '📊', title: 'Filtros Activos de Armónicos', description: 'Soluciones de calidad de energía para reducir distorsión armónica y mejorar la eficiencia eléctrica.' },
-      { icon: '✅', title: 'Mantenimiento y Servicio Técnico', description: 'Contratos de mantenimiento preventivo y correctivo con respuesta técnica especializada.' },
+      { icon: svgIcons?.[0] || '⚡', useSvg: !!svgIcons, title: 'Transformadores de Potencia', description: 'Transformadores de distribución y potencia para proyectos industriales, mineros y de infraestructura eléctrica.' },
+      { icon: svgIcons?.[1] || '🔌', useSvg: !!svgIcons, title: 'Sub Estaciones Eléctricas', description: 'Diseño y construcción de sub-estaciones eléctricas completas, desde ingeniería hasta puesta en marcha.' },
+      { icon: svgIcons?.[2] || '🏭', useSvg: !!svgIcons, title: 'Tableros Eléctricos', description: 'Tableros de distribución, control y protección para cualquier capacidad y aplicación industrial.' },
+      { icon: svgIcons?.[3] || '🔧', useSvg: !!svgIcons, title: 'Ducto de Barras', description: 'Sistemas de distribución de energía por ducto de barras blindado para plantas industriales.' },
+      { icon: svgIcons?.[4] || '📊', useSvg: !!svgIcons, title: 'Filtros Activos de Armónicos', description: 'Soluciones de calidad de energía para reducir distorsión armónica y mejorar eficiencia eléctrica.' },
+      { icon: svgIcons?.[5] || '✅', useSvg: !!svgIcons, title: 'Mantenimiento y Servicio Técnico', description: 'Contratos de mantenimiento preventivo y correctivo con respuesta técnica especializada.' },
     ],
     general: [
       { icon: '✅', title: 'Calidad garantizada', description: 'Todos nuestros productos y servicios cumplen con los más altos estándares de calidad.' },
@@ -469,6 +499,11 @@ function buildJSXComponent(analysis, geminiImages, ds, assets) {
   const fonts = ds.fonts;
   const br = ds.borderRadius;
 
+  // Pre-computed tinted backgrounds from brand primary
+  const primaryRgb = hexToRgb(colors.primary);
+  const featuresBg = `rgba(${primaryRgb}, 0.04)`; // Very subtle tint for Features section
+  const impactBg = colors.primary; // Solid primary for Impact numbers section
+
   // REGLA 1: Real logo URL from scraped assets
   const logoUrl = assets?.logo_url || null;
   const logoImgTag = logoUrl
@@ -477,8 +512,10 @@ function buildJSXComponent(analysis, geminiImages, ds, assets) {
 
   // REGLA 4: Best available images for each section
   const siteImages = assets?.images || [];
-  const heroImageData   = pickImage(siteImages, geminiImages, 'hero_image', 0);
-  const ctaImageData    = pickImage(siteImages, geminiImages, 'cta_bg', 1);
+  const sectionImages = assets?.section_images || null;
+  const visualPrompts = analysis.visual_analysis?.image_prompts || null;
+  const heroImageData = pickImage(siteImages, geminiImages, 'hero_image', 0, sectionImages, visualPrompts);
+  const ctaImageData  = pickImage(siteImages, geminiImages, 'cta_bg', 1, sectionImages, visualPrompts);
 
   const heroImgStyle = heroImageData
     ? `\`linear-gradient(135deg, rgba(${hexToRgb(colors.primary)},0.88) 0%, rgba(${hexToRgb(colors.secondary)},0.82) 100%), url(${heroImageData.src}) center/cover no-repeat\``
@@ -488,14 +525,10 @@ function buildJSXComponent(analysis, geminiImages, ds, assets) {
     ? `\`linear-gradient(135deg, rgba(${hexToRgb(colors.primary)},0.9), rgba(${hexToRgb(colors.secondary)},0.85)), url(${ctaImageData.src}) center/cover no-repeat\``
     : `\`linear-gradient(135deg, \${DS.primary} 0%, \${DS.secondary} 100%)\``;
 
-  // REGLA 5: Client logos carousel data
+  // REGLA 5: Client logos carousel — SOLO si hay logos reales, NUNCA texto
   const clientLogoUrls = assets?.client_logos || [];
-  const hasRealClientLogos = clientLogoUrls.length >= 3;
-  const clientLogoNamesDefault = ['Cencosud', 'Sodexo', 'MAPFRE', 'Gloria', 'ENEL', 'San Fernando', 'Los Portales', 'USIL', 'ASBANC', 'Ferreyros'];
-
-  const clientLogosData = hasRealClientLogos
-    ? JSON.stringify(clientLogoUrls)
-    : JSON.stringify(clientLogoNamesDefault);
+  const hasRealClientLogos = clientLogoUrls.length >= 1;
+  const clientLogosData = JSON.stringify(clientLogoUrls);
 
   return `
 // ─── GrowBy Redesign — generated by GrowBy Web Redesign Agent v0.3.1 ───────
@@ -701,12 +734,11 @@ function HeroSection() {
   );
 }
 
-// ─── CLIENT LOGOS ─── REGLA 5: Carrusel infinito CSS animation ───────────────
+// ─── CLIENT LOGOS ─── REGLA 5: Solo logos reales — ocultar si no hay ─────────
 function ClientLogos() {
-  const hasRealLogos = ${hasRealClientLogos};
   const items = ${clientLogosData};
-
-  // Duplicate items for seamless loop
+  // Si no hay logos reales, no mostrar la sección
+  if (!items || items.length === 0) return null;
   const allItems = [...items, ...items];
 
   return (
@@ -720,31 +752,18 @@ function ClientLogos() {
       </FadeIn>
       <div style={{ overflow: 'hidden', position: 'relative' }}>
         <div style={{
-          display: 'flex',
-          gap: hasRealLogos ? '48px' : '64px',
+          display: 'flex', gap: '48px',
           animation: 'logoScroll 30s linear infinite',
-          width: 'max-content',
-          alignItems: 'center',
+          width: 'max-content', alignItems: 'center',
         }}>
-          {allItems.map((item, i) => (
-            hasRealLogos
-              ? <img key={i} src={item} alt="client logo"
-                  style={{ height: '40px', width: 'auto', objectFit: 'contain',
-                           opacity: 0.6, filter: 'grayscale(100%)',
-                           transition: 'opacity 0.2s, filter 0.2s', flexShrink: 0 }}
-                  onMouseEnter={e => { e.target.style.opacity = '1'; e.target.style.filter = 'grayscale(0%)'; }}
-                  onMouseLeave={e => { e.target.style.opacity = '0.6'; e.target.style.filter = 'grayscale(100%)'; }}
-                />
-              : <span key={i} style={{
-                  fontFamily: DS.headingFont, fontWeight: 700, fontSize: '1rem',
-                  color: DS.mid, opacity: 0.55, letterSpacing: '-0.01em',
-                  whiteSpace: 'nowrap', flexShrink: 0,
-                  transition: 'opacity 0.2s, color 0.2s',
-                }}
-                  onMouseEnter={e => { e.target.style.opacity = '1'; e.target.style.color = DS.primary; }}
-                  onMouseLeave={e => { e.target.style.opacity = '0.55'; e.target.style.color = DS.mid; }}>
-                  {item}
-                </span>
+          {allItems.map((logo, i) => (
+            <img key={i} src={logo} alt="cliente"
+              style={{ height: '40px', width: 'auto', objectFit: 'contain',
+                       opacity: 0.6, filter: 'grayscale(100%)',
+                       transition: 'opacity 0.2s, filter 0.2s', flexShrink: 0 }}
+              onMouseEnter={e => { e.target.style.opacity = '1'; e.target.style.filter = 'grayscale(0%)'; }}
+              onMouseLeave={e => { e.target.style.opacity = '0.6'; e.target.style.filter = 'grayscale(100%)'; }}
+            />
           ))}
         </div>
       </div>
@@ -752,22 +771,22 @@ function ClientLogos() {
   );
 }
 
-// ─── FEATURES ────────────────────────────────────────────────────────────────
+// ─── FEATURES ─── Fondo tintado + SVG icons ──────────────────────────────────
 function FeaturesSection() {
   const features = ${JSON.stringify(features)};
 
   return (
-    <section id="servicios" style={{ background: DS.bg, padding: '96px 24px' }}>
+    <section id="servicios" style={{ background: '${featuresBg}', padding: '96px 24px' }}>
       <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
         <FadeIn>
           <div style={{ textAlign: 'center', marginBottom: '64px' }}>
             <h2 style={{ fontFamily: DS.headingFont, fontWeight: 800,
                          fontSize: 'clamp(2rem,4vw,2.75rem)', color: DS.dark, marginBottom: '16px' }}>
-              ${copy.value_section?.h2 || '¿Por qué GrowBy?'}
+              ${copy.value_section?.h2 || `¿Por qué elegir ${companyName}?`}
             </h2>
             <p style={{ fontFamily: DS.bodyFont, fontSize: '1.1rem', color: DS.mid,
                         maxWidth: '560px', margin: '0 auto', lineHeight: 1.7 }}>
-              ${copy.value_section?.body || 'Accedes a un equipo completo de especialistas digitales sin los costos de contratación tradicional.'}
+              ${copy.value_section?.body || 'Soluciones especializadas con respaldo técnico y experiencia comprobada en el sector.'}
             </p>
           </div>
         </FadeIn>
@@ -775,18 +794,21 @@ function FeaturesSection() {
           {features.map((feat, i) => (
             <FadeIn key={i} delay={i * 100}>
               <div style={{
-                background: DS.bg, borderRadius: DS.br,
+                background: '#ffffff', borderRadius: DS.br,
                 padding: '36px', border: \`1px solid rgba(0,0,0,0.06)\`,
                 boxShadow: '0 2px 16px rgba(0,0,0,0.05)',
                 transition: 'transform 0.25s ease, box-shadow 0.25s ease',
               }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = \`0 12px 40px \${DS.primary}18\`; }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = \`0 12px 40px \${DS.primary}22\`; }}
                 onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 16px rgba(0,0,0,0.05)'; }}>
                 <div style={{ width: '56px', height: '56px', borderRadius: DS.br,
                               background: \`\${DS.primary}15\`, display: 'flex',
                               alignItems: 'center', justifyContent: 'center',
-                              fontSize: '1.75rem', marginBottom: '20px' }}>
-                  {feat.icon}
+                              fontSize: '1.75rem', marginBottom: '20px',
+                              color: DS.primary }}>
+                  {feat.useSvg
+                    ? <span dangerouslySetInnerHTML={{ __html: feat.icon }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px' }} />
+                    : feat.icon}
                 </div>
                 <h3 style={{ fontFamily: DS.headingFont, fontWeight: 700, fontSize: '1.2rem',
                              color: DS.dark, marginBottom: '12px' }}>{feat.title}</h3>

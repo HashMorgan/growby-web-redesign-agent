@@ -1,146 +1,120 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
-import { exec } from 'child_process';
-import { broadcast, activeJobs } from '../app.js';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
+import Anthropic from '@anthropic-ai/sdk';
+import { broadcast } from '../app.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const OUTPUTS_DIR = path.join(__dirname, '..', '..', 'outputs');
 
-// Simple HTML adjustment without Claude API - just parse and modify
-function adjustHtml(html, feedback) {
-  // For now, we'll return the HTML as-is with a comment noting the feedback
-  // In a full implementation, you'd parse the HTML and make specific changes
-  const comment = `\n<!-- Feedback aplicado: ${feedback} -->\n`;
-  return html.replace('</body>', `${comment}</body>`);
-}
-
-async function redeployToNetlify(outputPath, version) {
-  return new Promise((resolve, reject) => {
-    const deployScript = path.join(outputPath, '..', '..', 'scripts', 'deploy-netlify.sh');
-
-    exec(`bash "${deployScript}" "${outputPath}"`, {
-      timeout: 120_000,
-    }, (error, stdout, stderr) => {
-      if (error) {
-        console.error('Deploy error:', error);
-        reject(error);
-        return;
-      }
-
-      // Try to read the deploy URL
-      const urlFile = path.join(outputPath, 'deploy-url.txt');
-      if (fs.existsSync(urlFile)) {
-        const netlifyUrl = fs.readFileSync(urlFile, 'utf8').trim();
-        resolve(netlifyUrl);
-      } else {
-        resolve(null);
-      }
-    });
-  });
-}
-
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   const { jobId, feedback } = req.body;
 
   if (!jobId || !feedback) {
-    return res.status(400).json({
-      error: 'jobId y feedback son requeridos'
-    });
+    return res.status(400).json({ error: 'jobId y feedback son requeridos' });
   }
 
-  // Get job data
-  const jobData = activeJobs.get(jobId);
-  if (!jobData) {
-    return res.status(404).json({
-      error: 'Job no encontrado. Debe generar un rediseño primero.'
-    });
+  const outputDir = path.join(OUTPUTS_DIR, jobId);
+  if (!fs.existsSync(outputDir)) {
+    return res.status(404).json({ error: `Output no encontrado: ${jobId}` });
   }
 
-  const { outputPath } = jobData;
-  const currentVersion = jobData.version || 1;
-  const newVersion = currentVersion + 1;
+  // Respond immediately, then process async
+  res.json({ jobId, status: 'adjusting' });
 
   try {
-    // Emit progress
-    broadcast({ jobId, step: 'adjusting', message: '🔧 Aplicando ajustes...', progress: 30 });
+    broadcast({ jobId, step: 'adjusting', message: '🔧 Aplicando ajustes con IA...', progress: 20 });
 
-    // Read current HTML
-    const currentHtmlPath = path.join(outputPath, `index.html`);
-    if (!fs.existsSync(currentHtmlPath)) {
-      throw new Error('No se encontró el archivo index.html');
+    // Find latest HTML version
+    const htmlFiles = fs.readdirSync(outputDir)
+      .filter(f => f.match(/^index(-v\d+)?\.html$/))
+      .sort((a, b) => {
+        const va = parseInt(a.match(/v(\d+)/)?.[1] || '0');
+        const vb = parseInt(b.match(/v(\d+)/)?.[1] || '0');
+        return vb - va;
+      });
+
+    if (htmlFiles.length === 0) throw new Error('No se encontró index.html');
+
+    const latestHtmlPath = path.join(outputDir, htmlFiles[0]);
+    const currentHtml = fs.readFileSync(latestHtmlPath, 'utf8');
+    const version = (parseInt(htmlFiles[0].match(/v(\d+)/)?.[1] || '1')) + 1;
+
+    broadcast({ jobId, step: 'adjusting', message: '🤖 Claude está modificando el diseño...', progress: 40 });
+
+    let adjustedHtml;
+
+    if (process.env.ANTHROPIC_API_KEY) {
+      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+      const response = await client.messages.create({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 8000,
+        messages: [{
+          role: 'user',
+          content: `Eres un experto en rediseño web. Tienes este HTML de un rediseño web y el siguiente feedback del cliente.
+Modifica ÚNICAMENTE las secciones mencionadas en el feedback preservando todo el resto del código intacto.
+Devuelve SOLO el HTML completo modificado, sin explicaciones, sin markdown, sin bloques de código.
+
+FEEDBACK DEL CLIENTE:
+${feedback}
+
+HTML ACTUAL:
+${currentHtml.substring(0, 50000)}`
+        }]
+      });
+
+      adjustedHtml = response.content[0].text;
+
+      if (!adjustedHtml.includes('<!DOCTYPE') && !adjustedHtml.includes('<html')) {
+        throw new Error('Claude no devolvió HTML válido');
+      }
+    } else {
+      // Fallback sin API key: registrar feedback como nota visible
+      const note = `\n<style>.feedback-note{position:fixed;bottom:16px;right:16px;background:#5D55D7;color:#fff;padding:12px 20px;border-radius:8px;font-size:0.875rem;max-width:300px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2)}</style>\n<div class="feedback-note">⚙️ Ajuste pendiente: ${feedback}</div>`;
+      adjustedHtml = currentHtml.replace('</body>', `${note}\n</body>`);
+      broadcast({ jobId, step: 'adjusting', message: '⚠️ Sin ANTHROPIC_API_KEY — feedback registrado como nota', progress: 60 });
     }
-
-    const currentHtml = fs.readFileSync(currentHtmlPath, 'utf8');
-
-    // Apply adjustments (simplified - in real implementation, use Claude API)
-    broadcast({ jobId, step: 'adjusting', message: '✏️ Modificando secciones...', progress: 50 });
-    const adjustedHtml = adjustHtml(currentHtml, feedback);
 
     // Save new version
-    const newHtmlPath = path.join(outputPath, `index-v${newVersion}.html`);
+    const newHtmlFile = `index-v${version}.html`;
+    const newHtmlPath = path.join(outputDir, newHtmlFile);
     fs.writeFileSync(newHtmlPath, adjustedHtml);
+    fs.writeFileSync(path.join(outputDir, 'index.html'), adjustedHtml);
 
-    // Also update the main index.html
-    fs.writeFileSync(currentHtmlPath, adjustedHtml);
+    // Log feedback
+    const logPath = path.join(outputDir, 'feedback-log.json');
+    const log = fs.existsSync(logPath) ? JSON.parse(fs.readFileSync(logPath, 'utf8')) : [];
+    log.push({ version, feedback, timestamp: new Date().toISOString(), model: process.env.ANTHROPIC_API_KEY ? 'claude-sonnet-4-5' : 'none' });
+    fs.writeFileSync(logPath, JSON.stringify(log, null, 2));
 
-    // Save feedback log
-    const feedbackLogPath = path.join(outputPath, 'feedback-log.json');
-    let feedbackLog = [];
-    if (fs.existsSync(feedbackLogPath)) {
-      feedbackLog = JSON.parse(fs.readFileSync(feedbackLogPath, 'utf8'));
-    }
-    feedbackLog.push({
-      version: newVersion,
-      feedback,
-      timestamp: new Date().toISOString()
-    });
-    fs.writeFileSync(feedbackLogPath, JSON.stringify(feedbackLog, null, 2));
+    broadcast({ jobId, step: 'adjusting', message: '🚀 Publicando versión ajustada en Netlify...', progress: 75 });
 
     // Re-deploy to Netlify
-    broadcast({ jobId, step: 'adjusting', message: '🚀 Re-desplegando a Netlify...', progress: 80 });
-
-    let netlifyUrl = jobData.netlifyUrl;
-    try {
-      const newUrl = await redeployToNetlify(outputPath, newVersion);
-      if (newUrl) netlifyUrl = newUrl;
-    } catch (deployError) {
-      console.warn('Deploy falló, usando URL anterior:', deployError.message);
+    let netlifyUrl = `/preview/${jobId}/index.html`;
+    if (process.env.NETLIFY_AUTH_TOKEN) {
+      try {
+        const siteName = `growby-${jobId.replace(/-\d{4}-\d{2}-\d{2}$/, '')}`;
+        const deployOut = execSync(
+          `npx netlify-cli deploy --dir="${outputDir}" --prod --site-name="${siteName}" 2>&1`,
+          { encoding: 'utf8', env: { ...process.env }, timeout: 60000 }
+        );
+        const urlMatch = deployOut.match(/https:\/\/[^\s]+\.netlify\.app/);
+        if (urlMatch) netlifyUrl = urlMatch[0];
+      } catch (deployErr) {
+        console.warn('  ⚠ Netlify deploy falló, usando preview local:', deployErr.message.slice(0, 100));
+      }
     }
 
-    // Update job data
-    jobData.version = newVersion;
-    jobData.netlifyUrl = netlifyUrl;
-    activeJobs.set(jobId, jobData);
+    broadcast({ jobId, step: 'adjusted', message: `✅ Versión ${version} lista`, progress: 100, netlifyUrl, version });
 
-    // Emit completion
-    broadcast({
-      jobId,
-      step: 'adjusted',
-      message: `✅ Ajuste v${newVersion} aplicado`,
-      progress: 100,
-      netlifyUrl,
-      version: newVersion
-    });
-
-    res.json({
-      success: true,
-      version: newVersion,
-      netlifyUrl,
-      message: 'Ajuste aplicado correctamente'
-    });
-
-  } catch (error) {
-    console.error('Error en ajuste:', error);
-    broadcast({
-      jobId,
-      step: 'error',
-      message: `❌ Error al ajustar: ${error.message}`,
-      progress: 0
-    });
-
-    res.status(500).json({
-      error: error.message
-    });
+  } catch (err) {
+    console.error('Error en adjust:', err.message);
+    broadcast({ jobId, step: 'error', message: `❌ Error al ajustar: ${err.message}`, progress: 0 });
   }
 });
 

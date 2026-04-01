@@ -159,18 +159,33 @@ function extractAssets(html, baseUrl) {
   }
   assets.images = [...new Set(imgUrls)].slice(0, 20);
 
-  // ── Client logos ─────────────────────────────────────────────────────────
-  const clientSectionRegex = /<(?:section|div|ul)[^>]+class=["'][^"']*(?:client|partner|logo|brand|trust|cliente|aliado|marca)[^"']*["'][^>]*>([\s\S]*?)<\/(?:section|div|ul)>/gi;
+  // ── Client logos — aggressive multi-strategy extraction ─────────────────
+  const IMG_EXTS = /\.(png|jpg|jpeg|svg|webp)(\?[^"']*)?$/i;
+
+  // Strategy 1: sections with client/partner class names
+  const clientSectionRegex = /<(?:section|div|ul|article)[^>]+(?:class|id)=["'][^"']*(?:client|partner|logo|brand|trust|cliente|aliado|marca|sponsor)[^"']*["'][^>]*([\s\S]{0,8000}?)<\/(?:section|div|ul|article)>/gi;
   while ((m = clientSectionRegex.exec(html)) !== null) {
     const sectionImgs = m[1].match(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi) || [];
     for (const imgTag of sectionImgs) {
       const srcMatch = /src=["']([^"']+)["']/.exec(imgTag);
-      if (srcMatch) {
+      if (srcMatch && IMG_EXTS.test(srcMatch[1])) {
         const url = toAbsoluteUrl(srcMatch[1], baseUrl);
-        if (url) assets.client_logos.push(url);
+        if (url && !/icon|favicon|arrow|bullet|check|star|social/i.test(url)) {
+          assets.client_logos.push(url);
+        }
       }
     }
   }
+
+  // Strategy 2: images with path hints (/logos/, /clientes/, /partners/, etc.)
+  const logoPathRegex = /<img[^>]+src=["']([^"']*(?:\/logos?\/|\/clientes?\/|\/partners?\/|\/brands?\/|\/sponsors?\/|\/aliados?\/|\/marcas?\/)([^"']+))["'][^>]*>/gi;
+  while ((m = logoPathRegex.exec(html)) !== null) {
+    if (IMG_EXTS.test(m[1])) {
+      const url = toAbsoluteUrl(m[1], baseUrl);
+      if (url) assets.client_logos.push(url);
+    }
+  }
+
   assets.client_logos = [...new Set(assets.client_logos)].slice(0, 20);
 
   // ── Videos ───────────────────────────────────────────────────────────────
@@ -178,6 +193,50 @@ function extractAssets(html, baseUrl) {
   while ((m = iframeRegex.exec(html)) !== null) assets.videos.push(m[1]);
 
   return assets;
+}
+
+// ─── Section-specific image extraction ───────────────────────────────────────
+function extractSectionImages(html, allImages, baseUrl) {
+  const toAbs = (src) => src ? toAbsoluteUrl(src, baseUrl) : null;
+  const section_images = {};
+
+  // Hero: find large images in hero/banner sections
+  const heroMatch = /<(?:section|div)[^>]*(?:class|id)=["'][^"']*(?:hero|banner|jumbotron|main-slide|slider|portada|wp-block-cover)[^"']*["'][^>]*([\s\S]{0,5000}?)<\/(?:section|div)>/i.exec(html);
+  if (heroMatch) {
+    const bgImg = /background(?:-image)?:\s*url\(['"]?([^'")\s]+)['"]?\)/i.exec(heroMatch[1]);
+    const tagImg = /<img[^>]+src=["']([^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/i.exec(heroMatch[1]);
+    section_images.hero = toAbs(bgImg?.[1]) || toAbs(tagImg?.[1]);
+  }
+  // Fallback: first real image that isn't a logo
+  if (!section_images.hero && allImages.length > 0) section_images.hero = allImages[0];
+
+  // About / team section
+  const aboutMatch = /<(?:section|div)[^>]*(?:class|id)=["'][^"']*(?:about|nosotros|equipo|quienes|team)[^"']*["'][^>]*([\s\S]{0,5000}?)<\/(?:section|div)>/i.exec(html);
+  if (aboutMatch) {
+    const tagImg = /<img[^>]+src=["']([^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/i.exec(aboutMatch[1]);
+    section_images.about = toAbs(tagImg?.[1]);
+  }
+
+  // Services section
+  const servicesMatch = /<(?:section|div)[^>]*(?:class|id)=["'][^"']*(?:services?|servicios?|solutions?)[^"']*["'][^>]*([\s\S]{0,5000}?)<\/(?:section|div)>/i.exec(html);
+  if (servicesMatch) {
+    const tagImg = /<img[^>]+src=["']([^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/i.exec(servicesMatch[1]);
+    section_images.services = toAbs(tagImg?.[1]);
+  }
+
+  // CTA section
+  const ctaMatch = /<(?:section|div)[^>]*(?:class|id)=["'][^"']*(?:cta|call-to-action|contacto|contact|accion)[^"']*["'][^>]*([\s\S]{0,5000}?)<\/(?:section|div)>/i.exec(html);
+  if (ctaMatch) {
+    const bgImg = /background(?:-image)?:\s*url\(['"]?([^'")\s]+)['"]?\)/i.exec(ctaMatch[1]);
+    const tagImg = /<img[^>]+src=["']([^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/i.exec(ctaMatch[1]);
+    section_images.cta = toAbs(bgImg?.[1]) || toAbs(tagImg?.[1]);
+  }
+  // Fallback: use a mid-point image for CTA
+  if (!section_images.cta && allImages.length > 1) {
+    section_images.cta = allImages[Math.floor(allImages.length / 2)];
+  }
+
+  return section_images;
 }
 
 // ─── Extract structured business data from content ────────────────────────────
@@ -219,7 +278,14 @@ function extractBusinessData(markdown, html, metadata, url) {
   const numLabels = ['Años de experiencia', 'Proyectos completados', 'Clientes satisfechos', 'Colaboradores'];
   numPatterns.forEach((pattern, idx) => {
     const match = pattern.exec(text);
-    if (match) impact_numbers.push({ value: match[1], label: numLabels[idx] });
+    if (match) {
+      const rawVal = match[1];
+      const numericVal = parseInt(rawVal.replace(/[+K%]/g, ''));
+      // REGLA CRÍTICA: omitir si el valor es 0 o no numérico
+      if (!isNaN(numericVal) && numericVal > 0) {
+        impact_numbers.push({ value: rawVal, label: numLabels[idx] });
+      }
+    }
   });
 
   // Contact info
@@ -422,11 +488,14 @@ export async function scrape(url) {
   // ── Extract visual assets ──────────────────────────────────────────────────
   console.log('  🎨 Extrayendo assets visuales...');
   const assets = extractAssets(allHtml, url);
+  // Extract section-specific images (hero, cta, about, services)
+  assets.section_images = extractSectionImages(allHtml, assets.images, url);
   console.log(`     Logo: ${assets.logo_url ? '✅ ' + assets.logo_url.slice(0, 60) : '❌ no detectado'}`);
   console.log(`     Colores: ${assets.colors.length > 0 ? '✅ ' + assets.colors.slice(0, 4).join(', ') : '❌ ninguno'}`);
   console.log(`     Fuentes: ${assets.fonts.length > 0 ? '✅ ' + assets.fonts.slice(0, 2).join(', ') : '❌ ninguna'}`);
   console.log(`     Imágenes reales: ${assets.images.length}`);
   console.log(`     Logos clientes: ${assets.client_logos.length}`);
+  console.log(`     Hero img: ${assets.section_images.hero ? '✅' : '❌'} · CTA img: ${assets.section_images.cta ? '✅' : '❌'}`);
 
   // ── Extract structured business data ──────────────────────────────────────
   const business = extractBusinessData(allMarkdown, allHtml, primaryMeta, url);
