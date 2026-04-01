@@ -91,17 +91,21 @@ if ! command -v netlify &>/dev/null; then
   npm install -g netlify-cli 2>&1 | tail -3
 fi
 
-# Verificar autenticación
+# Verificar autenticación — usar NETLIFY_AUTH_TOKEN del .env si está disponible
 echo "→ Verificando autenticación Netlify..."
-if ! netlify status 2>/dev/null | grep -q "Logged in"; then
+if [ -z "$NETLIFY_AUTH_TOKEN" ]; then
+  # Intentar cargar desde .env
+  ENV_FILE="$(dirname "$0")/../.env"
+  if [ -f "$ENV_FILE" ]; then
+    export NETLIFY_AUTH_TOKEN=$(grep 'NETLIFY_AUTH_TOKEN' "$ENV_FILE" | cut -d '=' -f2 | tr -d '"' | tr -d "'")
+  fi
+fi
+
+if [ -z "$NETLIFY_AUTH_TOKEN" ] && ! netlify status 2>/dev/null | grep -q "Logged in"; then
   echo "  ⚠ No estás autenticado en Netlify."
-  echo "  Ejecuta: netlify login"
-  echo "  Luego vuelve a correr este script."
-  # Guardar el HTML generado de todas formas
+  echo "  Configura NETLIFY_AUTH_TOKEN en .env o ejecuta: netlify login"
   cp "$DEPLOY_DIR/index.html" "$OUTPUT_PATH/preview.html"
-  echo ""
   echo "  ✓ preview.html guardado en $OUTPUT_PATH/preview.html"
-  echo "  Puedes abrirlo localmente con: open $OUTPUT_PATH/preview.html"
   exit 0
 fi
 
@@ -109,7 +113,7 @@ echo "  ✓ Netlify autenticado"
 echo ""
 echo "→ Desplegando a Netlify..."
 
-DEPLOY_OUTPUT=$(netlify deploy \
+DEPLOY_OUTPUT=$(NETLIFY_AUTH_TOKEN="$NETLIFY_AUTH_TOKEN" netlify deploy \
   --dir="$DEPLOY_DIR" \
   --prod \
   --site-name="$SITE_NAME" \
