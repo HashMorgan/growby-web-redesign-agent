@@ -10,6 +10,10 @@ import { planLayout } from './agents/layout-architect.js';
 import { buildComponents } from './agents/component-builder.js';
 import { assembleHTML } from './agents/assembler.js';
 
+// ── v1.0.0: Stitch MCP integration ──
+import { generateBrief, generateMetadata } from './agents/brief-generator.js';
+import { generateWithStitch, saveStitchOutput } from './agents/stitch-generator.js';
+
 // ── Legacy fallback ──
 import { scrape } from './scraper.js';
 
@@ -46,7 +50,7 @@ export async function run(url) {
 
   console.log('\n╔══════════════════════════════════════════════════╗');
   console.log('║   GrowBy Web Redesign Agent — Pipeline Completo  ║');
-  console.log('║   v0.9.0 · Multi-Subagent Architecture           ║');
+  console.log('║   v1.0.0 · Stitch MCP + Multi-Subagent Pipeline  ║');
   console.log('╚══════════════════════════════════════════════════╝\n');
   console.log(`🌐 URL objetivo: ${url}\n`);
 
@@ -124,7 +128,7 @@ export async function run(url) {
       url,
       timestamp,
       industria: industry,
-      agent_version: 'v0.9.2',
+      agent_version: 'v1.0.0',
     },
     scraping: {
       source: scrapingData.source,
@@ -175,24 +179,65 @@ export async function run(url) {
   console.log(`✓ Layout plan: ${layoutPlan.sections.length} secciones`);
 
   // ═══════════════════════════════════════════════════════
-  // FASE 4: COMPONENT BUILDING
+  // FASE 3.5: STITCH GENERATION (with fallback)
   // ═══════════════════════════════════════════════════════
-  console.log('\n━━━ FASE 4: COMPONENT BUILDING ━━━━━━━━━━━━━━━━━━━━');
-  const components = buildComponents(layoutPlan, fullAnalysis);
-  console.log(`✓ Componentes construidos`);
+  let htmlPath, jsxPath, htmlSize;
+  let usedStitch = false;
 
-  // ═══════════════════════════════════════════════════════
-  // FASE 5: ASSEMBLY
-  // ═══════════════════════════════════════════════════════
-  console.log('\n━━━ FASE 5: ASSEMBLY ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  const { htmlPath, jsxPath, htmlSize } = await assembleHTML(
-    components,
-    layoutPlan,
-    fullAnalysis,
-    outputDir
-  );
-  console.log(`✓ HTML assembleado: index.html (${(htmlSize / 1024).toFixed(1)} KB)`);
-  console.log(`📊 Tokens estimados — HTML final: ${Math.ceil(htmlSize / 4)} tokens`);
+  try {
+    console.log('\n━━━ FASE 3.5: STITCH AI GENERATION ━━━━━━━━━━━━━━━━');
+    const brief = generateBrief(fullAnalysis);
+    const metadata = generateMetadata(fullAnalysis);
+
+    console.log('📝 Brief generado para Stitch:');
+    console.log(`   ${brief}`);
+
+    const stitchHtml = await generateWithStitch(brief, metadata, {
+      timeout: 30000, // 30 segundos
+    });
+
+    // Si Stitch tuvo éxito, guardar el output
+    const stitchPath = saveStitchOutput(stitchHtml, outputDir, metadata);
+
+    // Copiar el output de Stitch como index.html
+    const indexPath = path.join(outputDir, 'index.html');
+    fs.copyFileSync(stitchPath, indexPath);
+
+    htmlPath = indexPath;
+    htmlSize = fs.statSync(htmlPath).size;
+    usedStitch = true;
+
+    console.log('✅ Stitch generation successful');
+    console.log(`   Output: index.html (${(htmlSize / 1024).toFixed(1)} KB)`);
+
+  } catch (stitchError) {
+    console.log(`\n⚠️  Stitch failed: ${stitchError.message}`);
+    console.log('   → Fallback to component-builder pipeline...');
+
+    // ═══════════════════════════════════════════════════════
+    // FASE 4: COMPONENT BUILDING (fallback)
+    // ═══════════════════════════════════════════════════════
+    console.log('\n━━━ FASE 4: COMPONENT BUILDING (fallback) ━━━━━━━━━');
+    const components = buildComponents(layoutPlan, fullAnalysis);
+    console.log(`✓ Componentes construidos`);
+
+    // ═══════════════════════════════════════════════════════
+    // FASE 5: ASSEMBLY (fallback)
+    // ═══════════════════════════════════════════════════════
+    console.log('\n━━━ FASE 5: ASSEMBLY (fallback) ━━━━━━━━━━━━━━━━━━');
+    const assemblyResult = await assembleHTML(
+      components,
+      layoutPlan,
+      fullAnalysis,
+      outputDir
+    );
+    htmlPath = assemblyResult.htmlPath;
+    jsxPath = assemblyResult.jsxPath;
+    htmlSize = assemblyResult.htmlSize;
+
+    console.log(`✓ HTML assembleado: index.html (${(htmlSize / 1024).toFixed(1)} KB)`);
+    console.log(`📊 Tokens estimados — HTML final: ${Math.ceil(htmlSize / 4)} tokens`);
+  }
 
   // ═══════════════════════════════════════════════════════
   // FASE 6: DEPLOY A NETLIFY
@@ -264,11 +309,18 @@ export async function run(url) {
 
   console.log(`\n🖼️  Prompts de imagen:  ${imgCount} prompts generados`);
 
+  console.log(`\n🤖 Generador utilizado: ${usedStitch ? 'Stitch AI (MCP)' : 'Component-Builder Pipeline'}`);
+
   console.log(`\n💾 Archivos generados:`);
   console.log(`   outputs/${clientSlug}-${today}/analysis.json`);
   console.log(`   outputs/${clientSlug}-${today}/layout-plan.json`);
   console.log(`   outputs/${clientSlug}-${today}/nano-banana-prompts.json`);
-  console.log(`   outputs/${clientSlug}-${today}/redesign.jsx`);
+  if (usedStitch) {
+    console.log(`   outputs/${clientSlug}-${today}/stitch-output.html`);
+    console.log(`   outputs/${clientSlug}-${today}/stitch-metadata.json`);
+  } else {
+    console.log(`   outputs/${clientSlug}-${today}/redesign.jsx`);
+  }
   console.log(`   outputs/${clientSlug}-${today}/index.html (${(htmlSize / 1024).toFixed(1)} KB)`);
 
   if (netlifyUrl) {

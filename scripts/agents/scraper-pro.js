@@ -673,28 +673,65 @@ export async function scrapeDeep(url) {
   console.log(`  📊 Números de impacto: ${business.impact_numbers.length}`);
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  // Pass markdown/html inline for agent processing but cap to avoid token bloat.
-  // Downstream (orchestrator.js) strips these before saving to analysis.json.
-  const markdownSnippet = allMarkdown.slice(0, 3000);
+
+  // ── Build structured content sections from markdown (replaces raw markdown) ──
+  // Each section: { id, title, body (max 200 chars), image_url }
+  const sectionBlocks = allMarkdown.split(/\n(?=#{1,2}\s)/);
+  const contentSections = sectionBlocks.slice(0, 10).map((block, idx) => {
+    const titleMatch = block.match(/^#{1,2}\s+(.+)/);
+    const title = titleMatch ? titleMatch[1].replace(/\*+/g, '').trim() : '';
+    const body = block.replace(/^#{1,3}.+\n?/, '').replace(/[#*`]/g, '').trim().slice(0, 200);
+    const imgMatch = block.match(/!\[.*?\]\((https?:\/\/[^)]+)\)/);
+    return {
+      id: `section-${idx}`,
+      title: title.slice(0, 80),
+      body,
+      image_url: imgMatch ? imgMatch[1] : (images[idx] || null),
+    };
+  }).filter(s => s.title || s.body);
+
+  // Extract hero text (first meaningful paragraph after H1)
+  const heroTextMatch = allMarkdown.match(/^#\s+(.+)\n+([\s\S]{20,300}?)(?=\n#|\n\n\n|$)/m);
+  const heroText = heroTextMatch
+    ? { h1: heroTextMatch[1].trim().slice(0, 100), intro: heroTextMatch[2].trim().slice(0, 200) }
+    : { h1: business.company_name, intro: primaryMeta.description || '' };
+
+  // Extract value proposition — first substantial paragraph
+  const valuePropMatch = allMarkdown.match(/(?:somos|we are|empresa|company|especializ|proveemos|ofrecemos)[^\n]{20,300}/i);
+  const valueProp = (valuePropMatch?.[0] || primaryMeta.description || '').slice(0, 200);
+
+  // Text preview for agent analysis — assembled from key content (max 2KB)
+  const textPreview = [
+    heroText.h1,
+    heroText.intro,
+    ...contentSections.slice(0, 5).map(s => `${s.title}: ${s.body}`),
+    business.key_services.slice(0, 3).map(s => s.name).join(', '),
+  ].filter(Boolean).join('\n').slice(0, 2000);
+
   const output = {
     url,
     timestamp,
     source,
     pages_scraped: pages.length,
-    markdown: markdownSnippet,
     markdown_full_length: allMarkdown.length,
-    html: '',  // raw HTML not propagated — structured data only
+    // Kept for backwards compat with agents that read scrapingData.markdown
+    markdown: textPreview,
     metadata: {
       title: primaryMeta.title || '',
       description: primaryMeta.description || '',
       ogImage: primaryMeta.ogImage || '',
     },
     industria_detectada: industria,
+    // ── Structured brand (replaces raw color arrays) ──────────────────────────
     brand: {
       name: business.company_name,
       personality,
       colors: {
-        primary: assets.colors[0] || null,
+        primary: assets.colors.filter(c => {
+          const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16);
+          const max=Math.max(r,g,b); const sat=max===0?0:(max-Math.min(r,g,b))/max;
+          return sat>=0.15 && (r+g+b)/3 <= 220;
+        })[0] || null,
         secondary: assets.colors[1] || null,
         accent: assets.colors[2] || null,
       },
@@ -703,18 +740,42 @@ export async function scrapeDeep(url) {
         body: assets.fonts[1] || assets.fonts[0] || null,
       },
     },
+    // ── Structured business data ──────────────────────────────────────────────
     business: {
       industry: industria,
       company_name: business.company_name,
+      value_proposition: valueProp,
       key_services: business.key_services,
+      differentiators: [],
       impact_numbers: business.impact_numbers,
+      cta_text: business.key_services[0]?.name ? `Cotizar ${business.key_services[0].name}` : 'Contáctanos',
       contact_email: business.contact_email,
       contact_phone: business.contact_phone,
       nav_items: business.nav_items,
       testimonials,
     },
-    assets,
-    // Enhanced fields (v0.9.0)
+    // ── Structured content (replaces raw markdown) ───────────────────────────
+    content: {
+      hero_text: heroText,
+      sections: contentSections,
+      // Compact text preview for agent analysis (max 2KB)
+      text_preview: textPreview,
+    },
+    // ── Compact assets (max 5 gallery images) ────────────────────────────────
+    assets: {
+      logo_url: assets.logo_url,
+      colors: assets.colors,
+      fonts: assets.fonts,
+      google_fonts_url: assets.google_fonts_url,
+      hero: assets.section_images?.hero || assets.images[0] || null,
+      cta: assets.section_images?.cta || null,
+      clients: assets.client_logos.slice(0, 8),
+      gallery: assets.images.slice(0, 5),
+      // Keep full images array for backwards compat
+      images: assets.images,
+      client_logos: assets.client_logos,
+      section_images: assets.section_images,
+    },
     testimonials,
     faq,
     navigation_pages: navigationPages,

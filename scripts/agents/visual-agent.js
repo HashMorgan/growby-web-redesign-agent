@@ -123,11 +123,11 @@ function buildPrompt(section, industry, designSystem) {
   };
 }
 
-export function runVisualAgent(scrapingData, uiData) {
-  const { industria_detectada, assets } = scrapingData;
-  const industry = industria_detectada || 'general';
+// Accepts either full scrapingData or { assets, brand, business } slice
+export function runVisualAgent(slice, uiData) {
+  const industry = slice.industria_detectada || slice.business?.industry || 'general';
   const designSystem = uiData?.design_system || {};
-  const realImages = assets?.images || [];
+  const realImages = slice.assets?.images || [];
 
   console.log(`  🖼️  [Visual Agent] Industria: ${industry} · Imágenes reales disponibles: ${realImages.length}`);
 

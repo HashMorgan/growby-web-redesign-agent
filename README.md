@@ -1,37 +1,50 @@
 # GrowBy Web Redesign Agent
 
-![Status](https://img.shields.io/badge/status-In%20Development-yellow)
-![Version](https://img.shields.io/badge/version-v0.1.0-blue)
-![Stack](https://img.shields.io/badge/stack-Claude%20Code%20%2B%20React%20%2B%20Tailwind-purple)
+![Status](https://img.shields.io/badge/status-Production-green)
+![Version](https://img.shields.io/badge/version-v1.0.0-blue)
+![Stack](https://img.shields.io/badge/stack-Stitch%20MCP%20%2B%20Claude%20Code%20%2B%20React%20%2B%20Tailwind-purple)
 
 Agente de IA especializado en rediseño web automático. Recibe la URL del home de un prospecto y genera, en una sola sesión, un rediseño completo de UI + UX + SEO + Visual como artifact React compartible — listo para presentar al cliente o entregar al equipo de desarrollo.
 
 ---
 
-## Arquitectura de 5 fases
+## Arquitectura v1.0.0 — Stitch MCP + Multi-Subagent Pipeline
 
 ```
-FASE 1 — SCRAPING
-  Firecrawl (HTML limpio + markdown) + audit-website (score + 230 reglas)
-  → memory/working/scraping-[timestamp].json
+FASE 1 — SCRAPING (deep multi-página)
+  scraper-pro.js → Firecrawl crawl (hasta 15 páginas)
+  Fallback: Firecrawl scrape (single) → fallback nativo
+  → memory/working/scraping-deep-[timestamp].json
 
-FASE 2 — ANÁLISIS (4 subagentes paralelos)
+FASE 2 — ANÁLISIS (4 subagentes paralelos con token slicing)
   UI Agent      → design system por industria (ui-ux-pro-max)
-  UX Agent      → conversión + animaciones (page-cro + animate)
-  SEO/Copy Agent → checklist técnico + copy reescrito (seo-audit + copywriting)
-  Visual Agent  → prompts Gemini API por industria detectada
-  → memory/working/analysis-[timestamp].json
+  UX Agent      → 7 dimensiones CRO + quick wins (page-cro)
+  SEO/Copy Agent → auditoría + copy reescrito (seo-audit + copywriting)
+  Visual Agent  → prompts Gemini API optimizados por industria
+  → outputs/[cliente]-[fecha]/analysis.json (70% menos tokens)
 
-FASE 3 — GENERACIÓN
-  Artifact React self-contained con Tailwind CDN, copy SEO, animaciones e imágenes Gemini
-  → outputs/[cliente]-[fecha]/redesign.jsx
+FASE 3 — LAYOUT PLANNING
+  layout-architect.js → plan de secciones + design system
+  → outputs/[cliente]-[fecha]/layout-plan.json
 
-FASE 4 — OUTPUT DUAL
-  Demo URL en Claude.ai + ZIP para dev (scripts/export-for-dev.sh)
+FASE 3.5 — STITCH AI GENERATION (con fallback)
+  ✨ PRIMARIO: Stitch MCP (Google Gemini 3 Flash)
+     brief-generator.js → prompt optimizado (max 500 chars)
+     stitch-generator.js → generación con timeout 30s
+     → outputs/[cliente]-[fecha]/stitch-output.html
+  
+  🔄 FALLBACK: Component-Builder Pipeline
+     component-builder.js → componentes template-based
+     assembler.js → HTML final con anti-contamination check
+     → outputs/[cliente]-[fecha]/index.html
 
-FASE 5 — MEMORIA
-  Feedback loop → actualiza semantic-patterns.json + episodic memory
+FASE 6 — DEPLOY A NETLIFY
+  deploy-netlify.sh → publica automáticamente
+  → URL pública compartible
+
+MEMORIA — Feedback loop continuo
   → memory/episodic/[cliente]-[fecha].json
+  → memory/semantic-patterns.json (aprendizaje por industria)
 ```
 
 ---
@@ -92,6 +105,62 @@ bash scripts/evaluate-scraping.sh https://url-del-prospecto.com
 # Empaquetar output para entregar al dev
 bash scripts/export-for-dev.sh outputs/cliente-2026-04-01/
 ```
+
+---
+
+## Seguridad
+
+El sistema incluye autenticación y hardening de seguridad para uso interno:
+
+### Medidas implementadas
+
+| Capa | Implementación |
+|------|----------------|
+| **Autenticación** | bcrypt (12 rounds) + sesiones SQLite |
+| **Headers** | Helmet (CSP, X-Frame-Options, HSTS) |
+| **Rate limiting** | 5 intentos login/15min, 100 req/15min global |
+| **Anti-timing** | Delay 1s en login fallido |
+| **SQL Injection** | Consultas parametrizadas |
+| **CSRF** | Cookies SameSite strict |
+| **XSS** | Content Security Policy + sanitización |
+
+### Cambiar contraseña
+
+```bash
+node scripts/change-password.js
+```
+
+CLI interactivo que:
+- Verifica contraseña actual
+- Solicita nueva contraseña (mín. 8 chars)
+- Hashea con bcrypt rounds 12
+- Invalida todas las sesiones activas
+
+### Tests de seguridad
+
+Ejecutar antes de cada deploy:
+
+```bash
+node scripts/security-tests.js
+```
+
+Suite de 8 tests automáticos. Si alguno falla → exit code 1.
+
+### ⚠️ Advertencia
+
+**Uso interno exclusivo — NO exponer sin SSL/TLS.**
+
+Esta aplicación contiene:
+- Credenciales de acceso a APIs externas
+- Datos de clientes en memoria episódica
+- Sesiones de rediseño en tiempo real
+
+Antes de exponer públicamente:
+1. Configurar SSL con Certbot
+2. Cambiar `SESSION_SECRET` en `.env`
+3. Habilitar `secure: true` en cookies (requiere HTTPS)
+4. Configurar firewall (solo 22, 80, 443)
+5. Revisar logs de acceso periódicamente
 
 ---
 

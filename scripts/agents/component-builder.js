@@ -1,4 +1,23 @@
 import 'dotenv/config';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const TEMPLATES_DIR = path.join(__dirname, '..', 'templates');
+
+// ─── Template engine — load file and replace {{key}} placeholders ─────────────
+function loadTemplate(name) {
+  const filePath = path.join(TEMPLATES_DIR, `${name}.html`);
+  if (!fs.existsSync(filePath)) return null;
+  return fs.readFileSync(filePath, 'utf8');
+}
+
+function fillTemplate(tpl, vars) {
+  return tpl.replace(/\{\{(\w+)\}\}/g, (_, key) =>
+    vars[key] !== undefined && vars[key] !== null ? String(vars[key]) : ''
+  );
+}
 
 // ─── SVG icons per industry ───────────────────────────────────────────────────
 const INDUSTRY_SVG_ICONS = {
@@ -54,32 +73,29 @@ function esc(str) {
 // ─── Component builders ───────────────────────────────────────────────────────
 
 function buildNav(layoutPlan, analysis) {
-  const ds = layoutPlan.design_system;
   const companyName = layoutPlan.company_name;
   const logoUrl = analysis.scraping?.assets?.logo_url || null;
   const navItems = analysis.scraping?.business?.nav_items || [];
   const ctaText = analysis.seo_copy_analysis?.rewritten_copy?.cta_primary || 'Contáctanos';
 
   const navLinks = navItems.length > 0
-    ? navItems.slice(0, 5).map(item =>
-        `<a href="#" class="nav-link">${esc(item)}</a>`
-      ).join('\n        ')
+    ? navItems.slice(0, 5).map(item => `<a href="#" class="nav-link">${esc(item)}</a>`).join('\n      ')
     : `<a href="#servicios" class="nav-link">Servicios</a>
-        <a href="#nosotros" class="nav-link">Nosotros</a>
-        <a href="#contacto" class="nav-link">Contacto</a>`;
+      <a href="#nosotros" class="nav-link">Nosotros</a>
+      <a href="#contacto" class="nav-link">Contacto</a>`;
 
   const logoHtml = logoUrl
     ? `<img src="${esc(logoUrl)}" alt="${esc(companyName)} logo" class="nav-logo-img" loading="eager">`
     : `<span class="nav-logo-text">${esc(companyName)}</span>`;
 
+  const tpl = loadTemplate('nav');
+  if (tpl) return fillTemplate(tpl, { company_name: esc(companyName), logo_html: logoHtml, nav_links: navLinks, cta_text: esc(ctaText) });
+
+  // Inline fallback
   return `<nav class="nav" id="navbar" role="navigation" aria-label="Navegación principal">
   <div class="nav-inner">
-    <a href="#" class="nav-brand" aria-label="${esc(companyName)} - Inicio">
-      ${logoHtml}
-    </a>
-    <div class="nav-links" id="nav-links">
-      ${navLinks}
-    </div>
+    <a href="#" class="nav-brand" aria-label="${esc(companyName)} - Inicio">${logoHtml}</a>
+    <div class="nav-links" id="nav-links">${navLinks}</div>
     <a href="#contacto" class="btn btn-primary btn-sm nav-cta">${esc(ctaText)}</a>
     <button class="nav-hamburger" id="nav-hamburger" aria-label="Abrir menú" aria-expanded="false" aria-controls="nav-links">
       <span></span><span></span><span></span>
@@ -94,29 +110,33 @@ function buildHero(props, ds) {
     ? `style="background-image: url('${esc(props.hero_image)}'); background-size: cover; background-position: center;"`
     : '';
 
-  const badgeHtml = props.badge_text
-    ? `<div class="hero-badge reveal-item">${esc(props.badge_text)}</div>`
-    : '';
+  const tpl = loadTemplate('hero');
+  if (tpl) {
+    return fillTemplate(tpl, {
+      hero_image_class: hasImage ? ' hero--image' : '',
+      hero_style: heroStyle,
+      hero_overlay: hasImage ? '<div class="hero-overlay"></div>' : '',
+      badge_html: props.badge_text ? `<div class="hero-badge reveal-item">${esc(props.badge_text)}</div>` : '',
+      headline: esc(props.headline),
+      subheadline: esc(props.subheadline),
+      cta_primary: esc(props.cta_primary),
+      cta_secondary_html: props.cta_secondary ? `<a href="#servicios" class="btn btn-ghost hero-cta-secondary reveal-item">${esc(props.cta_secondary)}</a>` : '',
+      trust_html: props.trust_micro ? `<p class="hero-trust reveal-item">${esc(props.trust_micro)}</p>` : '',
+    });
+  }
 
-  const trustHtml = props.trust_micro
-    ? `<p class="hero-trust reveal-item">${esc(props.trust_micro)}</p>`
-    : '';
-
-  const secondaryCta = props.cta_secondary
-    ? `<a href="#servicios" class="btn btn-ghost hero-cta-secondary reveal-item">${esc(props.cta_secondary)}</a>`
-    : '';
-
+  // Inline fallback
   return `<section class="hero${hasImage ? ' hero--image' : ''}" ${heroStyle} aria-labelledby="hero-heading">
   ${hasImage ? '<div class="hero-overlay"></div>' : ''}
   <div class="hero-content container">
-    ${badgeHtml}
+    ${props.badge_text ? `<div class="hero-badge reveal-item">${esc(props.badge_text)}</div>` : ''}
     <h1 id="hero-heading" class="hero-heading reveal-item">${esc(props.headline)}</h1>
     <p class="hero-sub reveal-item">${esc(props.subheadline)}</p>
     <div class="hero-actions reveal-item">
       <a href="#contacto" class="btn btn-primary btn-lg">${esc(props.cta_primary)}</a>
-      ${secondaryCta}
+      ${props.cta_secondary ? `<a href="#servicios" class="btn btn-ghost hero-cta-secondary reveal-item">${esc(props.cta_secondary)}</a>` : ''}
     </div>
-    ${trustHtml}
+    ${props.trust_micro ? `<p class="hero-trust reveal-item">${esc(props.trust_micro)}</p>` : ''}
   </div>
 </section>`;
 }
@@ -140,40 +160,52 @@ function buildLogoCarousel(props) {
 }
 
 function buildStatsBanner(props, ds) {
-  const statsHtml = (props.stats || []).map(stat =>
+  const statsItems = (props.stats || []).map(stat =>
     `<div class="stat-item reveal-item">
       <span class="stat-value">${esc(stat.value)}</span>
       <span class="stat-label">${esc(stat.label)}</span>
     </div>`
-  ).join('\n    ');
+  ).join('\n      ');
+
+  const tpl = loadTemplate('impact');
+  if (tpl) return fillTemplate(tpl, { stats_items: statsItems });
 
   return `<section class="stats" aria-label="Cifras de impacto">
-  <div class="container stats-grid">
-    ${statsHtml}
-  </div>
+  <div class="container stats-grid">${statsItems}</div>
 </section>`;
 }
 
 function buildFeaturesList(props, ds, industry) {
   const icons = getSVGIcons(industry);
-  const featuresHtml = (props.features || []).slice(0, 8).map((f, i) => {
+  const r = parseInt(ds.colors.primary.slice(1,3),16);
+  const g = parseInt(ds.colors.primary.slice(3,5),16);
+  const b = parseInt(ds.colors.primary.slice(5,7),16);
+  const featuresBg = `rgba(${r},${g},${b},0.04)`;
+
+  const featureItems = (props.features || []).slice(0, 8).map((f, i) => {
     const icon = icons[i % icons.length];
     return `<article class="feature-item reveal-item" style="--stagger-delay: ${i * 50}ms">
       <div class="feature-icon" aria-hidden="true">${icon}</div>
       <h3 class="feature-title">${esc(f.name || f.title)}</h3>
       <p class="feature-desc">${esc(f.description || f.name)}</p>
     </article>`;
-  }).join('\n    ');
+  }).join('\n      ');
 
-  return `<section class="features" id="servicios" aria-labelledby="features-heading">
+  const tpl = loadTemplate('services');
+  if (tpl) return fillTemplate(tpl, {
+    features_bg: featuresBg,
+    section_title: esc(props.headline || 'Nuestros servicios'),
+    section_sub: props.subheadline ? esc(props.subheadline) : '',
+    feature_items: featureItems,
+  });
+
+  return `<section class="features" id="servicios" aria-labelledby="features-heading" style="background:${featuresBg}">
   <div class="container">
     <div class="section-header">
       <h2 id="features-heading" class="section-title reveal-item">${esc(props.headline || 'Nuestros servicios')}</h2>
       ${props.subheadline ? `<p class="section-sub reveal-item">${esc(props.subheadline)}</p>` : ''}
     </div>
-    <div class="features-grid">
-      ${featuresHtml}
-    </div>
+    <div class="features-grid">${featureItems}</div>
   </div>
 </section>`;
 }
@@ -256,22 +288,31 @@ function buildTestimonials(props) {
 }
 
 function buildCTA(props, ds) {
-  const emailLink = props.contact_email
-    ? `<a href="mailto:${esc(props.contact_email)}" class="cta-contact-link">${esc(props.contact_email)}</a>`
+  const phoneHtml = props.contact_phone
+    ? `<a href="tel:${esc(props.contact_phone.replace(/\s/g,''))}" class="btn btn-ghost-light">${esc(props.contact_phone)}</a>`
     : '';
-  const phoneLink = props.contact_phone
-    ? `<a href="tel:${esc(props.contact_phone.replace(/\s/g, ''))}" class="cta-contact-link">${esc(props.contact_phone)}</a>`
-    : '';
+  const r=parseInt(ds.colors.primary.slice(1,3),16),g=parseInt(ds.colors.primary.slice(3,5),16),b=parseInt(ds.colors.primary.slice(5,7),16);
+  const darkened = `rgb(${Math.round(r*0.7)},${Math.round(g*0.7)},${Math.round(b*0.7)})`;
 
-  return `<section class="cta-section" id="contacto" aria-labelledby="cta-heading">
+  const tpl = loadTemplate('cta');
+  if (tpl) return fillTemplate(tpl, {
+    cta_bg: `linear-gradient(135deg, ${ds.colors.primary} 0%, ${darkened} 100%)`,
+    cta_image_overlay: '',
+    cta_headline: esc(props.headline),
+    cta_subtext: esc(props.subtext),
+    contact_email: esc(props.contact_email || '#'),
+    cta_button_text: esc(props.cta_primary),
+    phone_html: phoneHtml,
+  });
+
+  return `<section class="cta-section" id="contacto" aria-labelledby="cta-heading" style="background:linear-gradient(135deg,${ds.colors.primary},${darkened})">
   <div class="container cta-inner">
     <h2 id="cta-heading" class="cta-heading reveal-item">${esc(props.headline)}</h2>
     <p class="cta-sub reveal-item">${esc(props.subtext)}</p>
     <div class="cta-actions reveal-item">
-      <a href="mailto:${esc(props.contact_email || '#')}" class="btn btn-cta btn-lg">${esc(props.cta_primary)}</a>
-      ${props.cta_secondary ? `<a href="#servicios" class="btn btn-ghost-light">${esc(props.cta_secondary)}</a>` : ''}
+      <a href="mailto:${esc(props.contact_email||'#')}" class="btn btn-cta btn-lg">${esc(props.cta_primary)}</a>
+      ${phoneHtml}
     </div>
-    ${(emailLink || phoneLink) ? `<div class="cta-contacts">${emailLink}${phoneLink}</div>` : ''}
   </div>
 </section>`;
 }
@@ -281,33 +322,32 @@ function buildFooter(props, ds) {
     ? `<img src="${esc(props.logo_url)}" alt="${esc(props.company_name)} logo" class="footer-logo-img" loading="lazy">`
     : `<span class="footer-logo-text">${esc(props.company_name)}</span>`;
 
-  const linksHtml = (props.links || []).slice(0, 5).map(link =>
+  const serviceLinks = (props.links || []).slice(0, 5).map(link =>
     `<li><a href="#" class="footer-link">${esc(link)}</a></li>`
-  ).join('\n        ');
+  ).join('\n      ');
+
+  const contactHtml = [
+    props.contact_email ? `<a href="mailto:${esc(props.contact_email)}" class="footer-contact-link">${esc(props.contact_email)}</a>` : '',
+    props.contact_phone ? `<a href="tel:${esc(props.contact_phone.replace(/\s/g,''))}" class="footer-contact-link">${esc(props.contact_phone)}</a>` : '',
+  ].filter(Boolean).join('\n      ');
+
+  const tpl = loadTemplate('footer');
+  if (tpl) return fillTemplate(tpl, {
+    footer_logo_html: `<a href="#" aria-label="${esc(props.company_name)}">${logoHtml}</a>`,
+    tagline: esc(props.tagline || ''),
+    footer_service_links: serviceLinks,
+    footer_contact_html: contactHtml,
+    year: new Date().getFullYear(),
+    company_name: esc(props.company_name),
+  });
 
   return `<footer class="footer" role="contentinfo">
   <div class="container footer-grid">
-    <div class="footer-brand">
-      <a href="#" class="footer-brand-link" aria-label="${esc(props.company_name)} - Inicio">
-        ${logoHtml}
-      </a>
-      ${props.tagline ? `<p class="footer-tagline">${esc(props.tagline)}</p>` : ''}
-    </div>
-    ${linksHtml ? `<nav class="footer-nav" aria-label="Pie de página">
-      <ul class="footer-links">
-        ${linksHtml}
-      </ul>
-    </nav>` : ''}
-    <div class="footer-contact">
-      ${props.contact_email ? `<a href="mailto:${esc(props.contact_email)}" class="footer-contact-link">${esc(props.contact_email)}</a>` : ''}
-      ${props.contact_phone ? `<a href="tel:${esc(props.contact_phone.replace(/\s/g, ''))}" class="footer-contact-link">${esc(props.contact_phone)}</a>` : ''}
-    </div>
+    <div class="footer-brand"><a href="#" aria-label="${esc(props.company_name)}">${logoHtml}</a>${props.tagline?`<p class="footer-tagline">${esc(props.tagline)}</p>`:''}</div>
+    ${serviceLinks?`<nav class="footer-nav" aria-label="Servicios"><ul>${serviceLinks}</ul></nav>`:''}
+    <div class="footer-contact">${contactHtml}</div>
   </div>
-  <div class="footer-bottom">
-    <div class="container">
-      <p class="footer-copy">&copy; ${new Date().getFullYear()} ${esc(props.company_name)}. Todos los derechos reservados.</p>
-    </div>
-  </div>
+  <div class="footer-bottom"><div class="container"><p class="footer-copy">&copy; ${new Date().getFullYear()} ${esc(props.company_name)}.</p></div></div>
 </footer>`;
 }
 

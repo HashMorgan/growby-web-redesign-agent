@@ -4,38 +4,59 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GrowBy Redesign Agent</title>
+
+  <!-- Google Fonts: Sora + Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Global Styles + Local Styles -->
+  <link rel="stylesheet" href="styles-global.css">
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    /* Ensure headings use Sora */
+    h1, h2, h3, h4, h5, h6 {
+      font-family: 'Sora', sans-serif;
+    }
+  </style>
 </head>
 <body>
   <!-- Header -->
-  <header class="border-b border-gray-800 bg-[#03081B] sticky top-0 z-50">
+  <header class="border-b border-gray-800 bg-[#03081B] sticky top-0 z-50" style="border-bottom: 1px solid rgba(93, 85, 215, 0.2); backdrop-filter: blur(10px);">
     <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <!-- Logo -->
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-[#5D55D7] to-[#4a44b0] flex items-center justify-center text-white font-bold text-xl">
-          G
-        </div>
+        <div class="logo-icon">G</div>
         <div>
-          <h1 class="text-lg font-semibold">Redesign Agent</h1>
-          <p class="text-xs text-gray-400">by GrowBy</p>
+          <h1 class="text-lg font-semibold" style="font-family: 'Sora', sans-serif;">Redesign Agent</h1>
+          <p class="text-xs text-gray-400" style="font-family: 'Inter', sans-serif;">by GrowBy</p>
         </div>
       </div>
+
+      <!-- Right Side -->
       <div class="flex items-center gap-4">
+        <!-- WebSocket Status -->
         <div id="connectionBadge" class="connection-badge connected">
           <div class="dot"></div>
           <span>Conectado</span>
         </div>
+
+        <!-- Version Badge -->
         <div class="flex items-center gap-2 bg-green-900/30 text-green-400 px-3 py-1.5 rounded-full text-sm">
           <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-          <span>v1.0.0 · En línea</span>
+          <span style="font-family: 'Inter', sans-serif;">v1.0.0 · En línea</span>
         </div>
-        <!-- User + logout -->
+
+        <!-- User + Logout -->
         <div class="flex items-center gap-2">
           <span id="userBadge" class="text-sm text-gray-400 flex items-center gap-1">
             <span>👤</span><span id="usernameDisplay"></span>
           </span>
           <button id="logoutBtn"
-            class="text-sm text-gray-500 hover:text-red-400 transition-colors px-2 py-1 rounded"
+            class="btn-secondary"
+            style="font-size: 13px; padding: 6px 12px;"
             title="Cerrar sesión">
             Salir
           </button>

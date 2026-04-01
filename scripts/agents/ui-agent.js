@@ -272,9 +272,13 @@ const DESIGN_SYSTEMS = {
   },
 };
 
-export function runUIAgent(scrapingData) {
-  const { industria_detectada, metadata, markdown, brand, assets } = scrapingData;
-  const industry = industria_detectada || 'general';
+// Accepts either full scrapingData (legacy) or a { brand, business, assets } slice
+export function runUIAgent(slice) {
+  // Support both full scrapingData object and new slice format
+  const industry = slice.industria_detectada || slice.business?.industry || 'general';
+  const brand = slice.brand || {};
+  const assets = slice.assets || {};
+  const metadata = slice.metadata || {};
   const personality = brand?.personality || 'professional_technical';
 
   console.log(`  🎨 [UI Agent] Industria: ${industry} · Personalidad: ${personality}`);
