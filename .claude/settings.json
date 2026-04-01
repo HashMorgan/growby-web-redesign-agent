@@ -1,5 +1,6 @@
 {
   "model": "claude-sonnet-4-5",
+  "skillsPath": "skills/",
   "permissions": {
     "allow": ["Bash", "Read", "Write", "Edit"]
   }

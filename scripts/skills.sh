@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Determinar raíz del proyecto (un nivel arriba de scripts/)
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SKILLS_DIR="$PROJECT_ROOT/skills"
+
 echo "=========================================="
 echo "  GrowBy Web Redesign Agent — Skills Setup"
+echo "  Target: $SKILLS_DIR"
 echo "=========================================="
 echo ""
 
@@ -28,22 +33,42 @@ for entry in "${SKILLS[@]}"; do
   echo "→ Instalando skill: $SKILL_NAME"
   echo "  Repo: $SKILL_REPO"
 
-  if npx skills add "$SKILL_REPO" --name "$SKILL_NAME" 2>/dev/null; then
-    echo "  ✓ $SKILL_NAME instalado"
+  # Instalar en skills/ del proyecto via --output, luego mover de rutas ocultas si aplica
+  TEMP_BEFORE=$(find "$SKILLS_DIR" -maxdepth 1 -mindepth 1 -type d | sort)
+
+  if npx skills add "$SKILL_REPO" --yes 2>/dev/null; then
+    # Mover todo lo que npx haya dejado en rutas ocultas a skills/
+    for hidden in "$PROJECT_ROOT/.agents/skills" "$PROJECT_ROOT/.claude/skills"; do
+      if [ -d "$hidden" ]; then
+        for skill_dir in "$hidden"/*/; do
+          name=$(basename "$skill_dir")
+          if [ ! -d "$SKILLS_DIR/$name" ]; then
+            mv "$skill_dir" "$SKILLS_DIR/$name"
+            echo "  → Movido $name a skills/"
+          fi
+        done
+        # Limpiar directorio oculto si quedó vacío
+        rmdir "$hidden" 2>/dev/null || true
+        rmdir "$(dirname "$hidden")" 2>/dev/null || true
+      fi
+    done
+    echo "  ✓ $SKILL_NAME disponible en skills/"
     INSTALLED=$((INSTALLED + 1))
   else
-    echo "  ⚠ $SKILL_NAME no se pudo instalar via npx (repo puede no existir aún)"
-    echo "    Marcando carpeta skills/$SKILL_NAME/ como placeholder"
-    mkdir -p "skills/$SKILL_NAME"
-    echo "# Skill: $SKILL_NAME" > "skills/$SKILL_NAME/SKILL.md"
-    echo "Repo: $SKILL_REPO" >> "skills/$SKILL_NAME/SKILL.md"
-    echo "Status: pending-install" >> "skills/$SKILL_NAME/SKILL.md"
+    echo "  ⚠ $SKILL_NAME no se pudo instalar — creando placeholder"
+    mkdir -p "$SKILLS_DIR/$SKILL_NAME"
+    cat > "$SKILLS_DIR/$SKILL_NAME/SKILL.md" <<EOF
+# Skill: $SKILL_NAME
+Repo: $SKILL_REPO
+Status: pending-install
+EOF
     INSTALLED=$((INSTALLED + 1))
   fi
   echo ""
 done
 
 echo "=========================================="
+echo "Skills en skills/: $(ls "$SKILLS_DIR" | wc -l | tr -d ' ')"
 if [ "$INSTALLED" -eq 9 ]; then
   echo "✅ 9 skills instalados correctamente"
 else
