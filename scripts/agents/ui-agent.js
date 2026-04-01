@@ -287,7 +287,9 @@ export function runUIAgent(scrapingData) {
     const branded = assets.colors.filter(c => c && c.startsWith('#') && c.length === 7);
     const isGrayish = hex => {
       const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
-      return (Math.max(r,g,b) - Math.min(r,g,b)) / Math.max(r,g,b) < 0.15;
+      const max = Math.max(r,g,b);
+      const saturation = max === 0 ? 0 : (max - Math.min(r,g,b)) / max;
+      return saturation < 0.15;
     };
     const isLight = hex => {
       const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
