@@ -84,9 +84,14 @@ app.get('/login', requireNoAuth, (req, res) =>
   res.sendFile('login.html', { root: path.join(__dirname, 'client') }),
 );
 
-// ── Root — protected SPA ──────────────────────────────────────────────────────
+// ── Root — Dashboard (protected) ─────────────────────────────────────────────
 app.get('/', requireAuth, (req, res) =>
-  res.sendFile('index.html', { root: path.join(__dirname, 'client') }),
+  res.sendFile('dashboard.html', { root: path.join(__dirname, 'client') }),
+);
+
+// ── Web Redesign Agent — protected SPA ───────────────────────────────────────
+app.get('/web-redesign', requireAuth, (req, res) =>
+  res.sendFile('agents/web-redesign/index.html', { root: path.join(__dirname, 'client') }),
 );
 
 // ── HTTP server + WebSocket ───────────────────────────────────────────────────
@@ -116,21 +121,21 @@ export function broadcast(data) {
   });
 }
 
-// ── Protected API routes ─────────────────────────────────────────────────────
+// ── Protected API routes — Web Redesign Agent ────────────────────────────────
 import generateRoute from './routes/generate.js';
 import adjustRoute   from './routes/adjust.js';
 import approveRoute  from './routes/approve.js';
 
-app.use('/api/generate', requireAuth, generateRoute);
-app.use('/api/adjust',   requireAuth, adjustRoute);
-app.use('/api/approve',  requireAuth, approveRoute);
+app.use('/web-redesign/api/generate', requireAuth, generateRoute);
+app.use('/web-redesign/api/adjust',   requireAuth, adjustRoute);
+app.use('/web-redesign/api/approve',  requireAuth, approveRoute);
 
 // ── Health check (public — infra monitoring) ─────────────────────────────────
 app.get('/api/health', (req, res) =>
   res.json({
     status: 'ok',
-    version: '1.0.0',
-    agent: 'GrowBy Web Redesign Agent',
+    version: '0.5.0',
+    platform: 'GrowBy Agents',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     activeJobs: activeJobs.size,
@@ -147,13 +152,14 @@ app.use((req, res) => res.status(404).json({ error: 'No encontrado' }));
 // ── Start ─────────────────────────────────────────────────────────────────────
 server.listen(PORT, () => {
   console.log('\n╔══════════════════════════════════════════════════╗');
-  console.log('║   🚀 GrowBy Redesign Agent — v1.0.0              ║');
+  console.log('║   🚀 GrowBy Agents Platform — v0.5.0             ║');
   console.log('║   Auth + Security hardening active               ║');
   console.log('╚══════════════════════════════════════════════════╝\n');
-  console.log(`🌐 URL:         http://localhost:${PORT}`);
+  console.log(`🌐 Dashboard:   http://localhost:${PORT}/`);
+  console.log(`🎨 Redesign:    http://localhost:${PORT}/web-redesign`);
   console.log(`🔒 Auth:        bcrypt + sessions + helmet + rate-limit`);
   console.log(`📡 WebSocket:   ws://localhost:${PORT}`);
-  console.log(`🔗 Subdominio:  agent-redesign.growby.tech\n`);
+  console.log(`🔗 Dominio:     agents.growby.digital\n`);
 });
 
 export default app;

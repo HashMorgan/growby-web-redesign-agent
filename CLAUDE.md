@@ -477,8 +477,10 @@ output: redesign for [cliente]    # Para outputs generados
 v0.1.0 — foundation (repo + skills)
 v0.2.0 — analysis-engine
 v0.3.0 — artifact-generator
-v1.0.0 — release
-v1.1.0 — first-patterns
+v0.3.1 — brand-identity-preservation
+v1.0.0 — server-deploy (Express + WebSocket + interfaz web)
+v1.0.1 — auth-hardening (bcrypt + sessions + helmet)
+v0.5.0 — multi-agent-platform (dashboard + agents.growby.digital)
 ```
 
 ---
@@ -566,6 +568,215 @@ git push
 🧠 Guardado en: memory/working/sesion-[NNN]-[nombre].md
 ⏭️  Próximo paso: [acción concreta]
 ```
+
+---
+
+## PLATAFORMA — agents.growby.digital
+
+### Propósito
+
+Plataforma web interna multi-agente para que el equipo GrowBy ejecute agentes IA sin usar la terminal.
+
+**URL:** agents.growby.digital (Droplet DigitalOcean 159.223.199.204)
+
+### Rutas
+
+| Ruta | Descripción |
+|------|-------------|
+| `/` | Dashboard — listado de todos los agentes |
+| `/web-redesign` | Web Redesign Agent |
+| `/login` | Login (bcrypt + sessions) |
+| `/web-redesign/api/*` | API del Web Redesign Agent |
+| `/api/auth/*` | Auth global (login, logout, me) |
+| `/api/health` | Health check |
+
+### Arquitectura
+
+- **Frontend:** Vanilla JS + Tailwind CDN (no build step)
+- **Backend:** Express.js + WebSocket (puerto 3001) en DigitalOcean
+- **Endpoints:**
+  * `POST /web-redesign/api/generate` → ejecuta orchestrator.js completo
+  * `POST /web-redesign/api/adjust` → regenera secciones específicas con feedback
+  * `POST /web-redesign/api/approve` → guarda conformidad en memory-manager
+  * `GET /web-redesign/api/stats` → número de rediseños generados
+- **Nginx:** `agents.growby.digital` → proxy Docker bridge `172.18.0.1:3001`
+- **Nginx config:** append en `/root/growby-sra-v2/nginx.conf` (Docker volume)
+
+### Estructura de archivos
+
+```
+server/
+├── app.js                              # Express + WebSocket server (puerto 3001)
+├── middleware/auth.js                  # bcrypt + session + rate limit
+├── routes/
+│   ├── generate.js                     # POST /web-redesign/api/generate + GET /stats
+│   ├── adjust.js                       # POST /web-redesign/api/adjust
+│   └── approve.js                      # POST /web-redesign/api/approve
+└── client/
+    ├── dashboard.html                  # Dashboard — 3 agent cards
+    ├── login.html                      # Login page
+    ├── styles.css                      # GrowBy design system (#5D55D7, Inter)
+    └── agents/
+        └── web-redesign/
+            ├── index.html              # Web Redesign Agent SPA
+            ├── styles.css              # Agent styles
+            └── app.js                  # Agent WebSocket client
+```
+
+### Deploy en Droplet
+
+- **Puerto:** 3001
+- **Process manager:** PM2
+- **Comando:** `pm2 start server/app.js --name "redesign-agent"`
+- **Nginx config:** bloque adicional en `/root/growby-sra-v2/nginx.conf`
+
+### Sesión de implementación
+
+**Sesión 4** — Interfaz Web + Auth + Plataforma multi-agente
+
+---
+
+## ROADMAP DE SESIONES
+
+### Sesión 1 — Fundación del Proyecto (COMPLETADA)
+- [x] Crear repositorio y estructura base
+- [x] Configurar .env con API keys
+- [x] Instalar 9 skills via skills.sh
+- [x] Escribir CLAUDE.md completo
+- [x] Configurar .gitignore
+- [x] Commit inicial + tag v0.1.0
+
+### Sesión 2 — Motor de Análisis (COMPLETADA)
+- [x] Crear scraper.js con firecrawl
+- [x] Crear 4 agentes de análisis en scripts/agents/
+- [x] Crear orchestrator.js que ejecuta los 4 en paralelo
+- [x] Implementar detección de industria
+- [x] Guardar análisis completo en outputs/
+- [x] Test con URL real
+- [x] Commit + tag v0.2.0
+
+### Sesión 3 — Generator + Deploy (COMPLETADA)
+- [x] Crear generator.js que consume analysis.json
+- [x] Integrar Gemini API para generación de imágenes
+- [x] Crear templates React base (Hero, Features, Testimonials, CTA)
+- [x] Crear script deploy-netlify.sh
+- [x] Integrar orchestrator → generator → deploy en pipeline completo
+- [x] Test end-to-end: URL → análisis → artifact → Netlify
+- [x] Commit + tag v0.3.0
+
+### Sesión 4 — Interfaz Web + Auth + Plataforma (COMPLETADA)
+- [x] Crear server/app.js: Express + WebSocket server puerto 3001
+- [x] Crear route /web-redesign/api/generate: ejecuta orchestrator, emite progreso via WebSocket
+- [x] Crear route /web-redesign/api/adjust: recibe feedback en texto, regenera secciones
+- [x] Crear route /web-redesign/api/approve: guarda conformidad en episodic memory
+- [x] Crear agents/web-redesign/index.html: UI completa con branding GrowBy (#5D55D7)
+- [x] Auth layer: bcrypt + sessions + helmet + rate limiting + login page
+- [x] Deploy en Droplet: PM2 + Docker nginx + agent-redesign.growby.tech
+- [x] Commit + tag: v1.0.1 — release
+
+### Sesión 5 — Plataforma multi-agente agents.growby.digital (COMPLETADA)
+- [x] Reestructurar rutas: `/` → dashboard, `/web-redesign` → agente
+- [x] Mover client files → server/client/agents/web-redesign/
+- [x] Crear dashboard.html con 3 agent cards (Redesign activo, Proposal + Hiring próximamente)
+- [x] Añadir GET /web-redesign/api/stats → cuenta outputs/ folders
+- [x] Crear nginx/agents.growby.digital.conf
+- [x] Actualizar domain references → agents.growby.digital
+- [x] Commit + tag: v0.5.0
+
+---
+
+## SEGURIDAD Y AUTENTICACIÓN
+
+### Modelo de autenticación
+
+El sistema usa autenticación básica con un solo usuario:
+
+- **Usuario único:** `growby`
+- **Sesiones:** Cookie `httpOnly`, `SameSite: strict`, duración 8 horas
+- **Passwords:** Hasheados con bcryptjs (12 rounds)
+- **Base de datos:** SQLite en `db/agent.db` (NO commitear)
+- **Sessions store:** SQLite en `db/sessions.db` (NO commitear)
+
+### Archivos sensibles (NUNCA commitear)
+
+```bash
+.env                    # API keys (Gemini, Firecrawl)
+db/                     # Base de datos con credenciales hasheadas
+memory/episodic/        # Datos de clientes
+memory/working/         # Sesiones activas del agente
+```
+
+Todos estos archivos están en `.gitignore` automáticamente.
+
+### Cambiar contraseña
+
+Para cambiar la contraseña del usuario `growby`:
+
+```bash
+node scripts/change-password.js
+```
+
+El script interactivo:
+1. Pide contraseña actual (verificación contra BD)
+2. Pide nueva contraseña (mínimo 8 caracteres)
+3. Pide confirmar nueva contraseña
+4. Hashea con bcrypt rounds 12
+5. Actualiza en BD
+6. **Invalida todas las sesiones activas** (cierra sesión en todos los dispositivos)
+
+### Hardening implementado
+
+| Medida | Implementación | Protege contra |
+|--------|----------------|----------------|
+| **Helmet** | X-Frame-Options, X-Content-Type-Options, CSP, HSTS (prod) | Clickjacking, MIME sniffing, XSS |
+| **Rate limiting** | 5 intentos/IP en 15min (login), 100 req/15min (global) | Brute force, DDoS |
+| **Anti-timing attack** | Delay 1s en login fallido | Password enumeration |
+| **SQL Injection** | Consultas parametrizadas con better-sqlite3 | SQL injection |
+| **Session fixation** | Regenerar session ID en login | Session hijacking |
+| **CSRF** | SameSite strict en cookies | CSRF attacks |
+| **Password hashing** | bcrypt rounds 12 | Rainbow tables, dictionary attacks |
+| **httpOnly cookies** | No accesibles desde JavaScript | XSS cookie theft |
+
+### Pruebas de seguridad
+
+Ejecutar antes de cada deploy:
+
+```bash
+node scripts/security-tests.js
+```
+
+Suite de 8 tests automáticos:
+1. ✅ Health endpoint responde
+2. ✅ Headers de seguridad (Helmet) presentes
+3. ✅ Rate limiting activo
+4. ✅ Protección SQL Injection
+5. ✅ Protección CSRF
+6. ✅ Passwords hasheadas
+7. ✅ Cookies con httpOnly y SameSite
+8. ✅ Protección XSS
+
+Si algún test falla → exit code 1 (útil para CI/CD).
+
+### En producción (Droplet)
+
+Checklist antes de exponer al público:
+
+- [ ] **SSL/TLS:** Configurar Certbot para HTTPS obligatorio
+- [ ] **Cookie secure:** `secure: true` en `server/app.js` (requiere HTTPS)
+- [ ] **SESSION_SECRET:** Variable en `.env` del Droplet (distinto al local, generado con `crypto.randomBytes(32)`)
+- [ ] **Firewall:** Solo puertos 22 (SSH), 80 (HTTP), 443 (HTTPS) abiertos
+- [ ] **PM2:** Configurar restart automático en caso de crash
+- [ ] **Logs:** Configurar rotación de logs con PM2 (`pm2 install pm2-logrotate`)
+- [ ] **Backup BD:** Cron job diario para backup de `db/` en ubicación segura
+
+### Advertencia de uso interno
+
+⚠️ **IMPORTANTE:** Esta aplicación está diseñada para uso interno exclusivo del equipo GrowBy. NO exponer sin SSL/TLS y sin cambiar la contraseña por defecto.
+
+Si necesitas dar acceso temporal a un externo:
+1. Cambiar contraseña antes de dar acceso
+2. Cambiar contraseña después de terminar el acceso
+3. Revisar logs de acceso en `pm2 logs`
 
 ---
 

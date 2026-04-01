@@ -120,6 +120,19 @@ async function runPipeline(url, jobId) {
   }
 }
 
+// ── GET /stats — count of completed redesigns ────────────────────────────────
+router.get('/stats', (req, res) => {
+  try {
+    const outputsDir = path.join(PROJECT_ROOT, 'outputs');
+    if (!fs.existsSync(outputsDir)) return res.json({ redesigns: 0 });
+    const entries = fs.readdirSync(outputsDir, { withFileTypes: true });
+    const redesigns = entries.filter(e => e.isDirectory()).length;
+    return res.json({ redesigns });
+  } catch (_) {
+    return res.json({ redesigns: 0 });
+  }
+});
+
 router.post('/', async (req, res) => {
   const { url } = req.body;
 

@@ -1,0 +1,77 @@
+<!-- GrowBy Agents Header — Reutilizable en todos los agentes -->
+<header style="background: #03081B; border-bottom: 1px solid rgba(93, 85, 215, 0.2); padding: 0 24px; height: 64px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(10px);">
+
+  <!-- Logo + Título -->
+  <a href="/" style="display: flex; align-items: center; gap: 10px; text-decoration: none;">
+    <div style="width: 36px; height: 36px; background: #5D55D7; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-family: 'Sora', sans-serif; font-weight: 700; color: white; font-size: 18px; box-shadow: 0 4px 20px rgba(93, 85, 215, 0.35);">
+      G
+    </div>
+    <span style="font-family: 'Sora', sans-serif; font-weight: 600; color: white; font-size: 16px;">
+      Agents
+    </span>
+  </a>
+
+  <!-- Right Side: Status + User + Logout -->
+  <div style="display: flex; align-items: center; gap: 16px;">
+
+    <!-- WebSocket Status -->
+    <span id="ws-status" class="badge-active" style="font-size: 12px; color: #4ade80; display: flex; align-items: center; gap: 4px;">
+      <span class="animate-pulse" style="display: inline-block; width: 6px; height: 6px; background: currentColor; border-radius: 50%;"></span>
+      Conectado
+    </span>
+
+    <!-- Username -->
+    <span id="username-display" style="font-family: 'Inter', sans-serif; color: #94a3b8; font-size: 14px; display: flex; align-items: center; gap: 6px;">
+      <span>👤</span>
+      <span id="username-text">growby</span>
+    </span>
+
+    <!-- Logout Button -->
+    <button
+      onclick="logout()"
+      style="font-family: 'Inter', sans-serif; font-size: 13px; color: #94a3b8; background: none; border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 6px; padding: 6px 12px; cursor: pointer; transition: all 0.2s ease;"
+      onmouseover="this.style.color='#fff'; this.style.borderColor='rgba(93, 85, 215, 0.4)'; this.style.background='rgba(93, 85, 215, 0.1)'"
+      onmouseout="this.style.color='#94a3b8'; this.style.borderColor='rgba(148, 163, 184, 0.2)'; this.style.background='none'"
+    >
+      Salir
+    </button>
+
+  </div>
+
+</header>
+
+<script>
+  // Logout function (global, used by header)
+  async function logout() {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+    } catch (e) {
+      console.error('Logout error:', e);
+    } finally {
+      window.location.href = '/login';
+    }
+  }
+
+  // Update username display from session
+  async function updateUsername() {
+    try {
+      const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
+      if (res.ok) {
+        const data = await res.json();
+        const usernameEl = document.getElementById('username-text');
+        if (usernameEl && data.username) {
+          usernameEl.textContent = data.username;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch username:', e);
+    }
+  }
+
+  // Auto-update username on load
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', updateUsername);
+  } else {
+    updateUsername();
+  }
+</script>
