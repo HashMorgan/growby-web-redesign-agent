@@ -14,75 +14,28 @@ if [ ! -d "$OUTPUT_PATH" ]; then
   exit 1
 fi
 
-JSX_FILE=$(find "$OUTPUT_PATH" -name "redesign.jsx" -maxdepth 1 | head -1)
-if [ -z "$JSX_FILE" ]; then
-  echo "❌ Error: redesign.jsx no encontrado en $OUTPUT_PATH"
-  echo "   Ejecuta primero el generador: node scripts/generator.js"
+# The assembler.js already produces a complete HTML file — use it directly.
+HTML_FILE="${OUTPUT_PATH}/index.html"
+if [ ! -f "$HTML_FILE" ]; then
+  echo "❌ Error: index.html no encontrado en $OUTPUT_PATH"
+  echo "   Ejecuta primero el pipeline: node scripts/orchestrator.js <URL>"
   exit 1
+fi
+
+# Verify it's real HTML (not JSX)
+if grep -q "text/babel\|ReactDOM\|import React" "$HTML_FILE" 2>/dev/null; then
+  echo "⚠ index.html parece contener JSX/React — verificar pipeline"
 fi
 
 CLIENT_NAME=$(basename "$OUTPUT_PATH" | sed 's/-[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}$//')
 SITE_NAME="growby-${CLIENT_NAME}"
-DEPLOY_DIR="/tmp/netlify-deploy-${CLIENT_NAME}-$(date +%s)"
-mkdir -p "$DEPLOY_DIR"
 
 echo "=========================================="
-echo "  Deploy Netlify — GrowBy Agent"
+echo "  Deploy Netlify — GrowBy Agent v0.9.1"
 echo "  Cliente:   $CLIENT_NAME"
 echo "  Site name: $SITE_NAME"
-echo "  Deploy:    $DEPLOY_DIR"
+echo "  HTML:      $HTML_FILE ($(wc -c < "$HTML_FILE") bytes)"
 echo "=========================================="
-echo ""
-
-echo "→ Convirtiendo redesign.jsx a index.html self-contained..."
-
-JSX_CONTENT=$(cat "$JSX_FILE")
-
-cat > "$DEPLOY_DIR/index.html" << HTMLEOF
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${CLIENT_NAME} — Redesign Preview by GrowBy</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <style>
-    body { margin: 0; font-family: system-ui, sans-serif; }
-    #root { min-height: 100vh; }
-    .loading { display: flex; align-items: center; justify-content: center; height: 100vh; font-size: 1.25rem; color: #6b7280; }
-  </style>
-</head>
-<body>
-  <div id="root"><div class="loading">Cargando redesign...</div></div>
-  <script type="text/babel">
-    // GrowBy Web Redesign Agent — Generated Preview
-    // Cliente: ${CLIENT_NAME}
-    // Generado por: GrowBy Web Redesign Agent v0.2.0
-
-${JSX_CONTENT}
-
-    // Mount the app
-    const rootElement = document.getElementById('root');
-    const root = ReactDOM.createRoot(rootElement);
-    // Try to find and render the main component
-    const ComponentName = typeof App !== 'undefined' ? App :
-                          typeof Redesign !== 'undefined' ? Redesign :
-                          typeof HomePage !== 'undefined' ? HomePage :
-                          typeof LandingPage !== 'undefined' ? LandingPage : null;
-    if (ComponentName) {
-      root.render(React.createElement(ComponentName));
-    } else {
-      rootElement.innerHTML = '<div style="padding:2rem;color:#ef4444">⚠ No se encontró el componente principal (App/Redesign/HomePage). Verifica redesign.jsx.</div>';
-    }
-  </script>
-</body>
-</html>
-HTMLEOF
-
-echo "  ✓ index.html generado ($(wc -c < "$DEPLOY_DIR/index.html") bytes)"
 echo ""
 
 # Verificar netlify CLI
@@ -91,30 +44,30 @@ if ! command -v netlify &>/dev/null; then
   npm install -g netlify-cli 2>&1 | tail -3
 fi
 
-# Verificar autenticación — usar NETLIFY_AUTH_TOKEN del .env si está disponible
-echo "→ Verificando autenticación Netlify..."
-if [ -z "$NETLIFY_AUTH_TOKEN" ]; then
-  # Intentar cargar desde .env
+# Cargar NETLIFY_AUTH_TOKEN desde .env si no está en entorno
+if [ -z "${NETLIFY_AUTH_TOKEN:-}" ]; then
   ENV_FILE="$(dirname "$0")/../.env"
   if [ -f "$ENV_FILE" ]; then
-    export NETLIFY_AUTH_TOKEN=$(grep 'NETLIFY_AUTH_TOKEN' "$ENV_FILE" | cut -d '=' -f2 | tr -d '"' | tr -d "'")
+    TOKEN=$(grep 'NETLIFY_AUTH_TOKEN' "$ENV_FILE" | cut -d '=' -f2 | tr -d '"' | tr -d "'" | tr -d ' ')
+    if [ -n "$TOKEN" ]; then
+      export NETLIFY_AUTH_TOKEN="$TOKEN"
+    fi
   fi
 fi
 
-if [ -z "$NETLIFY_AUTH_TOKEN" ] && ! netlify status 2>/dev/null | grep -q "Logged in"; then
+if [ -z "${NETLIFY_AUTH_TOKEN:-}" ] && ! NETLIFY_AUTH_TOKEN="" netlify status 2>/dev/null | grep -q "Logged in"; then
   echo "  ⚠ No estás autenticado en Netlify."
   echo "  Configura NETLIFY_AUTH_TOKEN en .env o ejecuta: netlify login"
-  cp "$DEPLOY_DIR/index.html" "$OUTPUT_PATH/preview.html"
-  echo "  ✓ preview.html guardado en $OUTPUT_PATH/preview.html"
+  echo "  ✓ HTML listo en: $HTML_FILE"
   exit 0
 fi
 
 echo "  ✓ Netlify autenticado"
 echo ""
-echo "→ Desplegando a Netlify..."
+echo "→ Desplegando directorio a Netlify..."
 
-DEPLOY_OUTPUT=$(NETLIFY_AUTH_TOKEN="$NETLIFY_AUTH_TOKEN" netlify deploy \
-  --dir="$DEPLOY_DIR" \
+DEPLOY_OUTPUT=$(NETLIFY_AUTH_TOKEN="${NETLIFY_AUTH_TOKEN:-}" netlify deploy \
+  --dir="$OUTPUT_PATH" \
   --prod \
   --site-name="$SITE_NAME" \
   --message="GrowBy Redesign — ${CLIENT_NAME} — $(date +%Y-%m-%d)" \
@@ -135,10 +88,5 @@ if [ -n "$DEPLOY_URL" ]; then
 else
   echo ""
   echo "⚠ No se pudo extraer la URL del deploy. Revisa el output arriba."
-  # Fallback: guardar HTML local
-  cp "$DEPLOY_DIR/index.html" "$OUTPUT_PATH/preview.html"
-  echo "  preview.html local guardado en: $OUTPUT_PATH/preview.html"
+  echo "  HTML local listo en: $OUTPUT_PATH/index.html"
 fi
-
-# Limpiar temp
-rm -rf "$DEPLOY_DIR"

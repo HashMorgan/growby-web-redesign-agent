@@ -111,7 +111,7 @@ export async function run(url) {
       source: scrapingData.source,
       title: scrapingData.metadata.title,
       description: scrapingData.metadata.description,
-      markdown_length: scrapingData.markdown.length,
+      markdown_length: scrapingData.markdown_full_length || scrapingData.markdown?.length || 0,
       assets: scrapingData.assets || null,
       brand: scrapingData.brand || null,
       business: scrapingData.business || null,

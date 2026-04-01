@@ -673,13 +673,17 @@ export async function scrapeDeep(url) {
   console.log(`  📊 Números de impacto: ${business.impact_numbers.length}`);
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  // Pass markdown/html inline for agent processing but cap to avoid token bloat.
+  // Downstream (orchestrator.js) strips these before saving to analysis.json.
+  const markdownSnippet = allMarkdown.slice(0, 3000);
   const output = {
     url,
     timestamp,
     source,
     pages_scraped: pages.length,
-    markdown: allMarkdown,
-    html: allHtml,
+    markdown: markdownSnippet,
+    markdown_full_length: allMarkdown.length,
+    html: '',  // raw HTML not propagated — structured data only
     metadata: {
       title: primaryMeta.title || '',
       description: primaryMeta.description || '',
