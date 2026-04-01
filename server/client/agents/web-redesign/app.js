@@ -417,6 +417,7 @@ function handleError(data) {
 
 uiManager.elements.generateBtn.onclick = async () => {
   const url = uiManager.elements.urlInput.value.trim();
+  console.log('Botón clickeado, URL:', url);
 
   if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
     toastManager.error('Por favor ingresa una URL válida que comience con http:// o https://');
