@@ -4,100 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GrowBy Redesign Agent</title>
+  <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-    * { font-family: 'Inter', sans-serif; }
-
-    body {
-      background: #03081B;
-      color: #fff;
-    }
-
-    .grid-bg {
-      background-image:
-        linear-gradient(rgba(93, 85, 215, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(93, 85, 215, 0.03) 1px, transparent 1px);
-      background-size: 50px 50px;
-    }
-
-    .progress-bar {
-      transition: width 0.3s ease;
-    }
-
-    .step-circle {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: #1a1f3a;
-      border: 2px solid #2a2f4a;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      transition: all 0.3s ease;
-    }
-
-    .step-circle.active {
-      border-color: #5D55D7;
-      background: #5D55D7;
-    }
-
-    .step-circle.complete {
-      background: #10b981;
-      border-color: #10b981;
-    }
-
-    .btn-primary {
-      background: #5D55D7;
-      transition: all 0.2s ease;
-    }
-
-    .btn-primary:hover {
-      background: #4a44b0;
-      transform: translateY(-1px);
-      box-shadow: 0 8px 24px rgba(93, 85, 215, 0.3);
-    }
-
-    .btn-success {
-      background: #10b981;
-      transition: all 0.2s ease;
-    }
-
-    .btn-success:hover {
-      background: #059669;
-      transform: translateY(-1px);
-    }
-
-    .log-entry {
-      animation: slideIn 0.3s ease;
-    }
-
-    @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateX(-10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateX(0);
-      }
-    }
-
-    .star {
-      cursor: pointer;
-      font-size: 32px;
-      color: #2a2f4a;
-      transition: color 0.2s ease;
-    }
-
-    .star.active {
-      color: #FFCC00;
-    }
-
-    .hidden { display: none; }
-  </style>
 </head>
 <body>
   <!-- Header -->
@@ -112,9 +20,26 @@
           <p class="text-xs text-gray-400">by GrowBy</p>
         </div>
       </div>
-      <div class="flex items-center gap-2 bg-green-900/30 text-green-400 px-3 py-1.5 rounded-full text-sm">
-        <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-        <span>v1.0.0 · En línea</span>
+      <div class="flex items-center gap-4">
+        <div id="connectionBadge" class="connection-badge connected">
+          <div class="dot"></div>
+          <span>Conectado</span>
+        </div>
+        <div class="flex items-center gap-2 bg-green-900/30 text-green-400 px-3 py-1.5 rounded-full text-sm">
+          <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+          <span>v1.0.0 · En línea</span>
+        </div>
+        <!-- User + logout -->
+        <div class="flex items-center gap-2">
+          <span id="userBadge" class="text-sm text-gray-400 flex items-center gap-1">
+            <span>👤</span><span id="usernameDisplay"></span>
+          </span>
+          <button id="logoutBtn"
+            class="text-sm text-gray-500 hover:text-red-400 transition-colors px-2 py-1 rounded"
+            title="Cerrar sesión">
+            Salir
+          </button>
+        </div>
       </div>
     </div>
   </header>
@@ -151,34 +76,48 @@
 
         <!-- Barra de progreso -->
         <div class="bg-gray-800 rounded-full h-3 mb-8 overflow-hidden">
-          <div id="progressBar" class="progress-bar bg-[#5D55D7] h-full" style="width: 0%"></div>
+          <div id="progressBar" class="progress-bar" style="width: 0%"></div>
         </div>
 
-        <!-- Steps -->
+        <!-- Steps mejorados -->
         <div class="flex items-center justify-between mb-8">
-          <div class="flex flex-col items-center">
-            <div class="step-circle" id="step-scraping">🔍</div>
-            <span class="text-xs mt-2 text-gray-400">Scraping</span>
+          <!-- Step 1: Scraping -->
+          <div class="step" id="step-scraping">
+            <div class="step-icon">🔍</div>
+            <div class="step-label">Scraping</div>
+            <div class="step-status">⏳</div>
           </div>
           <div class="flex-1 h-0.5 bg-gray-700 mx-2"></div>
-          <div class="flex flex-col items-center">
-            <div class="step-circle" id="step-analysis">🧠</div>
-            <span class="text-xs mt-2 text-gray-400">Análisis</span>
+
+          <!-- Step 2: Análisis -->
+          <div class="step" id="step-analysis">
+            <div class="step-icon">🧠</div>
+            <div class="step-label">Análisis</div>
+            <div class="step-status">⏳</div>
           </div>
           <div class="flex-1 h-0.5 bg-gray-700 mx-2"></div>
-          <div class="flex flex-col items-center">
-            <div class="step-circle" id="step-design">🎨</div>
-            <span class="text-xs mt-2 text-gray-400">Design</span>
+
+          <!-- Step 3: Design -->
+          <div class="step" id="step-design">
+            <div class="step-icon">🎨</div>
+            <div class="step-label">Design</div>
+            <div class="step-status">⏳</div>
           </div>
           <div class="flex-1 h-0.5 bg-gray-700 mx-2"></div>
-          <div class="flex flex-col items-center">
-            <div class="step-circle" id="step-generating">⚡</div>
-            <span class="text-xs mt-2 text-gray-400">Generación</span>
+
+          <!-- Step 4: Generación -->
+          <div class="step" id="step-generating">
+            <div class="step-icon">⚡</div>
+            <div class="step-label">Generación</div>
+            <div class="step-status">⏳</div>
           </div>
           <div class="flex-1 h-0.5 bg-gray-700 mx-2"></div>
-          <div class="flex flex-col items-center">
-            <div class="step-circle" id="step-deploy">🚀</div>
-            <span class="text-xs mt-2 text-gray-400">Deploy</span>
+
+          <!-- Step 5: Deploy -->
+          <div class="step" id="step-deploy">
+            <div class="step-icon">🚀</div>
+            <div class="step-label">Deploy</div>
+            <div class="step-status">⏳</div>
           </div>
         </div>
 
@@ -200,6 +139,9 @@
           <h3 class="text-2xl font-bold">✅ Rediseño completado</h3>
           <div id="versionBadge" class="text-sm text-gray-400">Versión 1</div>
         </div>
+
+        <!-- Versions Panel -->
+        <div id="versionsPanel" class="hidden"></div>
 
         <!-- URL y acciones -->
         <div class="flex items-center gap-3 mb-6">
@@ -223,8 +165,15 @@
           </button>
         </div>
 
-        <!-- Preview iframe -->
-        <div class="bg-black rounded-lg overflow-hidden" style="height: 600px;">
+        <!-- Preview iframe con overlay -->
+        <div class="preview-container">
+          <div id="previewSkeleton" class="preview-skeleton"></div>
+          <div class="preview-label">
+            <span>Vista previa del rediseño — growby.tech</span>
+            <button class="btn-fullscreen" onclick="document.getElementById('previewIframe').requestFullscreen()">
+              🖥️ Pantalla completa
+            </button>
+          </div>
           <iframe
             id="previewIframe"
             class="w-full h-full"
@@ -301,267 +250,34 @@
     </div>
   </footer>
 
+  <script src="app.js"></script>
   <script>
-    // State
-    let currentJobId = null;
-    let currentRating = 0;
-    let ws = null;
-
-    // Elements
-    const idlePanel = document.getElementById('idlePanel');
-    const progressPanel = document.getElementById('progressPanel');
-    const resultPanel = document.getElementById('resultPanel');
-    const urlInput = document.getElementById('urlInput');
-    const generateBtn = document.getElementById('generateBtn');
-    const progressBar = document.getElementById('progressBar');
-    const currentMessage = document.getElementById('currentMessage');
-    const logContainer = document.getElementById('logContainer');
-    const netlifyUrl = document.getElementById('netlifyUrl');
-    const previewIframe = document.getElementById('previewIframe');
-    const copyUrlBtn = document.getElementById('copyUrlBtn');
-    const openTabBtn = document.getElementById('openTabBtn');
-    const feedbackText = document.getElementById('feedbackText');
-    const adjustBtn = document.getElementById('adjustBtn');
-    const approveBtn = document.getElementById('approveBtn');
-    const approvalComment = document.getElementById('approvalComment');
-    const approvalMessage = document.getElementById('approvalMessage');
-    const versionBadge = document.getElementById('versionBadge');
-    const stars = document.querySelectorAll('.star');
-    const ratingText = document.getElementById('ratingText');
-
-    // WebSocket connection
-    function connectWebSocket() {
-      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      ws = new WebSocket(`${protocol}//${location.host}`);
-
-      ws.onopen = () => {
-        console.log('✅ WebSocket conectado');
-      };
-
-      ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.jobId !== currentJobId) return;
-
-        updateProgress(data);
-
-        if (data.step === 'complete') {
-          showResult(data);
-        } else if (data.step === 'adjusted') {
-          updateResult(data);
-        } else if (data.step === 'error') {
-          showError(data.message);
-        }
-      };
-
-      ws.onerror = (error) => {
-        console.error('❌ WebSocket error:', error);
-      };
-
-      ws.onclose = () => {
-        console.log('📡 WebSocket cerrado. Reconectando en 3s...');
-        setTimeout(connectWebSocket, 3000);
-      };
-    }
-
-    // Update progress
-    function updateProgress(data) {
-      const { step, message, progress } = data;
-
-      progressBar.style.width = `${progress}%`;
-      currentMessage.textContent = message;
-
-      // Add to log
-      const time = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const entry = document.createElement('div');
-      entry.className = 'log-entry text-gray-400';
-      entry.textContent = `[${time}] ${message}`;
-      logContainer.appendChild(entry);
-      logContainer.scrollTop = logContainer.scrollHeight;
-
-      // Update step circles
-      const stepMap = {
-        scraping: 'scraping',
-        analysis: 'analysis',
-        ui_agent: 'design',
-        ux_agent: 'design',
-        seo_agent: 'design',
-        visual_agent: 'design',
-        generating: 'generating',
-        images: 'generating',
-        deploying: 'deploy'
-      };
-
-      const targetStep = stepMap[step];
-      if (targetStep) {
-        const circle = document.getElementById(`step-${targetStep}`);
-        if (circle) {
-          circle.classList.remove('active');
-          circle.classList.add('complete');
-        }
-      }
-    }
-
-    // Show result
-    function showResult(data) {
-      progressPanel.classList.add('hidden');
-      resultPanel.classList.remove('hidden');
-
-      netlifyUrl.value = data.netlifyUrl || '';
-      previewIframe.src = data.netlifyUrl || '';
-
-      // Enable buttons
-      copyUrlBtn.onclick = () => {
-        navigator.clipboard.writeText(netlifyUrl.value);
-        copyUrlBtn.textContent = '✓ Copiado';
-        setTimeout(() => { copyUrlBtn.textContent = '📋 Copiar URL'; }, 2000);
-      };
-
-      openTabBtn.onclick = () => {
-        window.open(netlifyUrl.value, '_blank');
-      };
-    }
-
-    // Update result after adjustment
-    function updateResult(data) {
-      netlifyUrl.value = data.netlifyUrl || '';
-      previewIframe.src = data.netlifyUrl || '';
-      versionBadge.textContent = `Versión ${data.version || 1}`;
-
-      feedbackText.value = '';
-    }
-
-    // Show error
-    function showError(message) {
-      currentMessage.textContent = message;
-      currentMessage.className = 'text-center text-lg text-red-400 mb-4';
-    }
-
-    // Generate redesign
-    generateBtn.onclick = async () => {
-      const url = urlInput.value.trim();
-      if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
-        alert('Por favor ingresa una URL válida que comience con http:// o https://');
-        return;
-      }
-
+    // Auth: load username + logout + 401 interceptor
+    (async () => {
       try {
-        const response = await fetch('/api/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url })
-        });
+        const me = await fetch('/api/auth/me', { credentials: 'same-origin' });
+        if (!me.ok) { window.location.href = '/login'; return; }
+        const { username } = await me.json();
+        const el = document.getElementById('usernameDisplay');
+        if (el) el.textContent = username;
+      } catch (_) { window.location.href = '/login'; }
+    })();
 
-        const data = await response.json();
-
-        if (response.ok) {
-          currentJobId = data.jobId;
-          idlePanel.classList.add('hidden');
-          progressPanel.classList.remove('hidden');
-        } else {
-          alert(data.error || 'Error al iniciar el rediseño');
-        }
-      } catch (error) {
-        alert('Error de conexión: ' + error.message);
-      }
-    };
-
-    // Adjust redesign
-    adjustBtn.onclick = async () => {
-      const feedback = feedbackText.value.trim();
-      if (!feedback) {
-        alert('Por favor describe qué cambiarías');
-        return;
-      }
-
-      adjustBtn.disabled = true;
-      adjustBtn.textContent = '⏳ Aplicando...';
-
-      try {
-        const response = await fetch('/api/adjust', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ jobId: currentJobId, feedback })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          alert(data.error || 'Error al aplicar ajuste');
-        }
-      } catch (error) {
-        alert('Error de conexión: ' + error.message);
-      } finally {
-        adjustBtn.disabled = false;
-        adjustBtn.textContent = 'Aplicar Ajuste';
-      }
-    };
-
-    // Rating stars
-    stars.forEach(star => {
-      star.addEventListener('click', () => {
-        currentRating = parseInt(star.dataset.rating);
-
-        stars.forEach((s, i) => {
-          if (i < currentRating) {
-            s.classList.add('active');
-            s.textContent = '★';
-          } else {
-            s.classList.remove('active');
-            s.textContent = '☆';
-          }
-        });
-
-        ratingText.textContent = currentRating === 1 ? 'Muy malo' :
-                                 currentRating === 2 ? 'Malo' :
-                                 currentRating === 3 ? 'Regular' :
-                                 currentRating === 4 ? 'Bueno' :
-                                 'Excelente';
-
-        approveBtn.disabled = false;
-      });
+    document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+      window.location.href = '/login';
     });
 
-    // Approve redesign
-    approveBtn.onclick = async () => {
-      if (currentRating === 0) {
-        alert('Por favor selecciona una calificación');
-        return;
+    // Global 401 interceptor: wrap fetch to catch session expiry
+    const _origFetch = window.fetch;
+    window.fetch = async (...args) => {
+      const res = await _origFetch(...args);
+      if (res.status === 401) {
+        const url = typeof args[0] === 'string' ? args[0] : args[0].url || '';
+        if (!url.includes('/api/auth/')) { window.location.href = '/login'; }
       }
-
-      approveBtn.disabled = true;
-      approveBtn.textContent = '⏳ Guardando...';
-
-      try {
-        const response = await fetch('/api/approve', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jobId: currentJobId,
-            score: currentRating,
-            feedback: approvalComment.value.trim() || null
-          })
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-          approvalMessage.classList.remove('hidden');
-          approvalMessage.textContent = data.message || '🧠 El agente aprendió de este rediseño';
-          approveBtn.textContent = '✅ Aprobado';
-        } else {
-          alert(data.error || 'Error al guardar aprobación');
-          approveBtn.disabled = false;
-          approveBtn.textContent = '✅ Aprobar y Guardar Aprendizaje';
-        }
-      } catch (error) {
-        alert('Error de conexión: ' + error.message);
-        approveBtn.disabled = false;
-        approveBtn.textContent = '✅ Aprobar y Guardar Aprendizaje';
-      }
+      return res;
     };
-
-    // Initialize WebSocket on page load
-    connectWebSocket();
   </script>
 </body>
 </html>
