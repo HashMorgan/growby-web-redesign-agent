@@ -1,0 +1,811 @@
+import 'dotenv/config';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { generateAllImages } from './gemini-client.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = path.join(__dirname, '..');
+
+function ensureDir(d) { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); }
+
+// Map analysis design_system → template-compatible DS format
+function mapDesignSystem(ds) {
+  const p = ds.palette || {};
+  const t = ds.typography || {};
+  const br = ds.border_radius || {};
+  return {
+    colors: {
+      primary:    p.primary    || '#7c3aed',
+      secondary:  p.secondary  || '#0891b2',
+      accent:     p.accent     || '#f59e0b',
+      neutral:    p.neutral_light || '#f4f4f5',
+      dark:       p.neutral_dark  || '#18181b',
+      mid:        p.neutral_mid   || '#52525b',
+      background: p.background   || '#ffffff',
+      surface:    p.surface      || '#fafafa',
+      success:    p.success      || '#22c55e',
+    },
+    fonts: {
+      heading: t.heading_font || 'Sora',
+      body:    t.body_font    || 'Inter',
+    },
+    borderRadius: br.md || '12px',
+    borderRadiusSm: br.sm || '6px',
+    borderRadiusLg: br.lg || '20px',
+    borderRadiusFull: br.full || '9999px',
+    shadows: ds.shadows || {},
+    spacingBase: ds.spacing_base || 8,
+  };
+}
+
+// GrowBy-specific features based on analysis
+function buildGrowByFeatures(analysis) {
+  const copy = analysis.seo_copy_analysis?.rewritten_copy;
+  return [
+    {
+      icon: '🚀',
+      title: 'Proyectos Projects',
+      description: 'Desarrollo de software, UX/UI, ecommerce e IA. Construimos soluciones a medida con el mejor talento de LatAm.',
+    },
+    {
+      icon: '🎯',
+      title: 'Hiring & Staffing',
+      description: 'Hunting TI, staff augmentation y outsourcing. Encontramos el talento que necesitas, cuando lo necesitas.',
+    },
+    {
+      icon: '🤖',
+      title: 'GrowBy AI',
+      description: 'IA conversacional, generativa y low-code. Automatizamos procesos y creamos experiencias inteligentes.',
+    },
+    {
+      icon: '📊',
+      title: 'Resultados medibles',
+      description: 'Más de 250 proyectos entregados. Trabajamos con métricas claras y entregamos resultados concretos desde el primer sprint.',
+    },
+    {
+      icon: '🌎',
+      title: 'Talento LatAm',
+      description: 'Red de +100,000 especialistas digitales en toda Latinoamérica. Talento de primer nivel, a costos competitivos.',
+    },
+    {
+      icon: '⚡',
+      title: 'Entrega rápida',
+      description: 'Primeros resultados en semanas, no meses. Metodología ágil con sprints de 2 semanas y demos continuas.',
+    },
+  ];
+}
+
+function buildTestimonials() {
+  return [
+    {
+      name: 'María González',
+      role: 'Directora de Tecnología',
+      company: 'Cencosud',
+      text: 'GrowBy entendió nuestros requerimientos desde el primer día. Entregaron el proyecto en tiempo récord con una calidad técnica excepcional.',
+      rating: 5,
+    },
+    {
+      name: 'Carlos Herrera',
+      role: 'CEO',
+      company: 'Sodexo LatAm',
+      text: 'El staff augmentation con GrowBy nos permitió escalar nuestro equipo de 5 a 20 desarrolladores en solo 3 semanas. Increíble.',
+      rating: 5,
+    },
+    {
+      name: 'Ana Ramírez',
+      role: 'VP de Producto',
+      company: 'MAPFRE',
+      text: 'Transformaron nuestro proceso de claims digitales con IA. Redujimos el tiempo de atención de 72h a menos de 6h.',
+      rating: 5,
+    },
+  ];
+}
+
+function buildFAQ() {
+  return [
+    { q: '¿Cuánto tarda en arrancar un proyecto?', a: 'La mayoría de proyectos comienzan dentro de los 5-7 días hábiles de aprobado el brief. Para staffing, presentamos candidatos en 48-72h.' },
+    { q: '¿Trabajan con empresas fuera de Perú?', a: 'Sí. Trabajamos con empresas en toda LatAm y USA. Nuestros especialistas operan en múltiples zonas horarias.' },
+    { q: '¿Cómo manejan la confidencialidad?', a: 'Firmamos NDA antes de cualquier conversación técnica. Todos nuestros colaboradores están sujetos a acuerdos de confidencialidad.' },
+    { q: '¿Puedo escalar o reducir el equipo?', a: 'Sí. Nuestro modelo TaaS te permite ajustar el tamaño del equipo mes a mes según tus necesidades de negocio.' },
+  ];
+}
+
+// Build the complete JSX component as a string
+function buildJSXComponent(analysis, images, ds) {
+  const copy = analysis.seo_copy_analysis?.rewritten_copy || {};
+  const features = buildGrowByFeatures(analysis);
+  const testimonials = buildTestimonials();
+  const faq = buildFAQ();
+  const colors = ds.colors;
+  const fonts = ds.fonts;
+  const br = ds.borderRadius;
+
+  const imgToSrc = (key) => images[key]
+    ? `data:image/jpeg;base64,${images[key]}`
+    : null;
+
+  const heroImg   = imgToSrc('hero_image');
+  const ctaBg     = imgToSrc('cta_bg');
+
+  // Inline styles as JS objects to avoid template literal escaping issues
+  return `
+// ─── GrowBy Redesign — generated by GrowBy Web Redesign Agent v0.3.0 ───────
+// Design system: ${ds.colors.primary} · ${ds.fonts.heading} + ${ds.fonts.body}
+
+const DS = {
+  primary:   '${colors.primary}',
+  secondary: '${colors.secondary}',
+  accent:    '${colors.accent}',
+  neutral:   '${colors.neutral}',
+  dark:      '${colors.dark}',
+  mid:       '${colors.mid}',
+  bg:        '${colors.background}',
+  surface:   '${colors.surface}',
+  br:        '${br}',
+  brSm:      '${ds.borderRadiusSm}',
+  brLg:      '${ds.borderRadiusLg}',
+  brFull:    '${ds.borderRadiusFull}',
+  headingFont: '"${fonts.heading}", system-ui, sans-serif',
+  bodyFont:    '"${fonts.body}", system-ui, sans-serif',
+};
+
+// ─── INTERSECTION OBSERVER HOOK ─────────────────────────────────────────────
+function useFadeIn(delay = 0) {
+  const ref = React.useRef(null);
+  const [visible, setVisible] = React.useState(false);
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect(); } },
+      { threshold: 0.12 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return [ref, visible, delay];
+}
+
+function FadeIn({ children, delay = 0, className = '' }) {
+  const [ref, visible] = useFadeIn(delay);
+  return (
+    <div ref={ref} className={className}
+      style={{ opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(28px)',
+               transition: \`opacity 0.6s ease \${delay}ms, transform 0.6s cubic-bezier(0.22,1,0.36,1) \${delay}ms\` }}>
+      {children}
+    </div>
+  );
+}
+
+// ─── HEADER / NAV ────────────────────────────────────────────────────────────
+function Header() {
+  const [scrolled, setScrolled] = React.useState(false);
+  React.useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  return (
+    <header style={{
+      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
+      background: scrolled ? 'rgba(255,255,255,0.95)' : 'transparent',
+      backdropFilter: scrolled ? 'blur(12px)' : 'none',
+      borderBottom: scrolled ? '1px solid rgba(0,0,0,0.08)' : 'none',
+      transition: 'all 0.3s ease',
+    }}>
+      <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 24px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    height: '72px' }}>
+        <a href="#" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
+          <span style={{ width: 36, height: 36, borderRadius: DS.brSm,
+                         background: \`linear-gradient(135deg, \${DS.primary}, \${DS.secondary})\`,
+                         display: 'flex', alignItems: 'center', justifyContent: 'center',
+                         color: '#fff', fontWeight: 800, fontSize: '1rem',
+                         fontFamily: DS.headingFont }}>G</span>
+          <span style={{ fontFamily: DS.headingFont, fontWeight: 700, fontSize: '1.2rem',
+                         color: scrolled ? DS.dark : '#fff' }}>GrowBy</span>
+        </a>
+        <nav style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+          {['Servicios', 'Proyectos', 'Equipo', 'Blog'].map(item => (
+            <a key={item} href="#" style={{
+              fontFamily: DS.bodyFont, fontSize: '0.9rem', fontWeight: 500,
+              color: scrolled ? DS.mid : 'rgba(255,255,255,0.85)',
+              textDecoration: 'none', transition: 'color 0.2s',
+            }}
+              onMouseEnter={e => e.target.style.color = DS.primary}
+              onMouseLeave={e => e.target.style.color = scrolled ? DS.mid : 'rgba(255,255,255,0.85)'}>
+              {item}
+            </a>
+          ))}
+        </nav>
+        <a href="#contacto" style={{
+          padding: '10px 24px', borderRadius: DS.brFull,
+          background: DS.primary, color: '#fff',
+          fontFamily: DS.bodyFont, fontWeight: 600, fontSize: '0.875rem',
+          textDecoration: 'none', transition: 'transform 0.15s, box-shadow 0.15s',
+          boxShadow: \`0 4px 16px \${DS.primary}44\`,
+        }}
+          onMouseEnter={e => { e.target.style.transform = 'scale(1.04)'; e.target.style.boxShadow = \`0 8px 24px \${DS.primary}55\`; }}
+          onMouseLeave={e => { e.target.style.transform = 'scale(1)'; e.target.style.boxShadow = \`0 4px 16px \${DS.primary}44\`; }}>
+          Cuéntanos tu proyecto
+        </a>
+      </div>
+    </header>
+  );
+}
+
+// ─── HERO SECTION ────────────────────────────────────────────────────────────
+function HeroSection() {
+  const heroStyle = {
+    minHeight: '100vh',
+    display: 'flex', alignItems: 'center',
+    position: 'relative', overflow: 'hidden',
+    background: ${heroImg
+      ? `\`linear-gradient(135deg, rgba(124,58,237,0.92) 0%, rgba(8,145,178,0.85) 100%), url(${heroImg}) center/cover no-repeat\``
+      : `\`linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 60%, #05647a 100%)\``
+    },
+    fontFamily: DS.bodyFont,
+  };
+
+  return (
+    <section style={heroStyle}>
+      {/* Decorative blobs */}
+      <div style={{ position: 'absolute', top: '-15%', right: '-10%', width: '600px', height: '600px',
+                    borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: '-20%', left: '-5%', width: '400px', height: '400px',
+                    borderRadius: '50%', background: 'rgba(255,255,255,0.03)', pointerEvents: 'none' }} />
+
+      <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '100px 24px 80px',
+                    display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '64px',
+                    alignItems: 'center' }}>
+        {/* Left: Copy */}
+        <div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px',
+                        background: 'rgba(255,255,255,0.12)', borderRadius: DS.brFull,
+                        padding: '6px 16px', marginBottom: '24px', animation: 'fadeInUp 0.5s ease forwards' }}>
+            <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.9)', fontWeight: 600,
+                           letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: DS.bodyFont }}>
+              Más de 250 proyectos entregados en LatAm 🚀
+            </span>
+          </div>
+          <h1 style={{ fontFamily: DS.headingFont, fontWeight: 800, fontSize: 'clamp(2.25rem,5vw,3.75rem)',
+                       color: '#fff', lineHeight: 1.1, marginBottom: '24px',
+                       animation: 'fadeInUp 0.7s ease 0.1s both' }}>
+            ${copy.h1?.rewritten || 'Diseñamos y desarrollamos soluciones digitales que hacen crecer tu empresa'}
+          </h1>
+          <p style={{ fontSize: '1.125rem', color: 'rgba(255,255,255,0.88)', lineHeight: 1.7,
+                      marginBottom: '40px', maxWidth: '520px',
+                      animation: 'fadeInUp 0.7s ease 0.2s both', fontFamily: DS.bodyFont }}>
+            ${copy.subheadline || 'Conectamos empresas con especialistas digitales de primer nivel en diseño, desarrollo, IA y marketing.'}
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', animation: 'fadeInUp 0.7s ease 0.3s both' }}>
+            <a href="#contacto" style={{
+              display: 'inline-block', padding: '16px 36px',
+              background: DS.accent, color: '#18181b',
+              borderRadius: DS.brFull, fontFamily: DS.bodyFont,
+              fontWeight: 700, fontSize: '1rem', textDecoration: 'none',
+              boxShadow: \`0 8px 32px \${DS.accent}55\`,
+              transition: 'transform 0.15s, box-shadow 0.15s',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.04)'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}>
+              ${copy.ctas?.primary || 'Cuéntanos tu proyecto'}
+            </a>
+            <a href="#proyectos" style={{
+              display: 'inline-block', padding: '16px 32px',
+              background: 'rgba(255,255,255,0.12)',
+              border: '2px solid rgba(255,255,255,0.3)',
+              color: '#fff', borderRadius: DS.brFull,
+              fontFamily: DS.bodyFont, fontWeight: 600, fontSize: '1rem',
+              textDecoration: 'none', transition: 'background 0.2s',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.2)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)'; }}>
+              ${copy.ctas?.secondary || 'Ver casos de éxito'}
+            </a>
+          </div>
+          <p style={{ marginTop: '16px', fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)',
+                      fontFamily: DS.bodyFont, animation: 'fadeInUp 0.7s ease 0.4s both' }}>
+            ${copy.ctas?.micro_copy || 'Respondemos en menos de 24 horas'}
+          </p>
+        </div>
+
+        {/* Right: Stats grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', animation: 'fadeInUp 0.8s ease 0.25s both' }}>
+          {[
+            { number: '250+', label: 'Proyectos entregados' },
+            { number: '100K+', label: 'Especialistas en red' },
+            { number: '6', label: 'Años de experiencia' },
+            { number: '98%', label: 'Clientes satisfechos' },
+          ].map((stat, i) => (
+            <div key={i} style={{
+              background: 'rgba(255,255,255,0.1)',
+              backdropFilter: 'blur(8px)',
+              borderRadius: DS.br,
+              padding: '28px',
+              border: '1px solid rgba(255,255,255,0.15)',
+            }}>
+              <div style={{ fontFamily: DS.headingFont, fontWeight: 800,
+                            fontSize: '2.25rem', color: '#fff', lineHeight: 1 }}>
+                {stat.number}
+              </div>
+              <div style={{ marginTop: '8px', fontSize: '0.85rem',
+                            color: 'rgba(255,255,255,0.7)', fontFamily: DS.bodyFont }}>
+                {stat.label}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── CLIENT LOGOS ────────────────────────────────────────────────────────────
+function ClientLogos() {
+  const clients = [
+    'Cencosud', 'Sodexo', 'MAPFRE', 'Gloria', 'ENEL',
+    'San Fernando', 'Los Portales', 'USIL', 'ASBANC', 'Ferreyros',
+  ];
+
+  return (
+    <section style={{ background: DS.surface, padding: '48px 24px', overflow: 'hidden' }}>
+      <FadeIn>
+        <p style={{ textAlign: 'center', fontFamily: DS.bodyFont, fontSize: '0.85rem',
+                    fontWeight: 600, color: DS.mid, textTransform: 'uppercase',
+                    letterSpacing: '0.1em', marginBottom: '32px' }}>
+          Empresas líderes que confían en GrowBy
+        </p>
+      </FadeIn>
+      <div style={{ display: 'flex', gap: '48px', flexWrap: 'wrap',
+                    justifyContent: 'center', alignItems: 'center' }}>
+        {clients.map((client, i) => (
+          <FadeIn key={client} delay={i * 60}>
+            <span style={{
+              fontFamily: DS.headingFont, fontWeight: 700, fontSize: '1rem',
+              color: DS.mid, opacity: 0.65, letterSpacing: '-0.01em',
+              transition: 'opacity 0.2s, color 0.2s', cursor: 'default',
+            }}
+              onMouseEnter={e => { e.target.style.opacity = '1'; e.target.style.color = DS.primary; }}
+              onMouseLeave={e => { e.target.style.opacity = '0.65'; e.target.style.color = DS.mid; }}>
+              {client}
+            </span>
+          </FadeIn>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ─── FEATURES ────────────────────────────────────────────────────────────────
+function FeaturesSection() {
+  const features = ${JSON.stringify(buildGrowByFeatures(analysis))};
+
+  return (
+    <section id="servicios" style={{ background: DS.bg, padding: '96px 24px' }}>
+      <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
+        <FadeIn>
+          <div style={{ textAlign: 'center', marginBottom: '64px' }}>
+            <h2 style={{ fontFamily: DS.headingFont, fontWeight: 800,
+                         fontSize: 'clamp(2rem,4vw,2.75rem)', color: DS.dark, marginBottom: '16px' }}>
+              ${copy.value_section?.h2 || '¿Por qué GrowBy?'}
+            </h2>
+            <p style={{ fontFamily: DS.bodyFont, fontSize: '1.1rem', color: DS.mid,
+                        maxWidth: '560px', margin: '0 auto', lineHeight: 1.7 }}>
+              ${copy.value_section?.body || 'Accedes a un equipo completo de especialistas digitales sin los costos de contratación tradicional.'}
+            </p>
+          </div>
+        </FadeIn>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '28px' }}>
+          {features.map((feat, i) => (
+            <FadeIn key={i} delay={i * 100}>
+              <div style={{
+                background: DS.bg, borderRadius: DS.br,
+                padding: '36px', border: \`1px solid rgba(0,0,0,0.06)\`,
+                boxShadow: '0 2px 16px rgba(0,0,0,0.05)',
+                transition: 'transform 0.25s ease, box-shadow 0.25s ease',
+              }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(124,58,237,0.12)'; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 16px rgba(0,0,0,0.05)'; }}>
+                <div style={{ width: '56px', height: '56px', borderRadius: DS.br,
+                              background: \`\${DS.primary}15\`, display: 'flex',
+                              alignItems: 'center', justifyContent: 'center',
+                              fontSize: '1.75rem', marginBottom: '20px' }}>
+                  {feat.icon}
+                </div>
+                <h3 style={{ fontFamily: DS.headingFont, fontWeight: 700, fontSize: '1.2rem',
+                             color: DS.dark, marginBottom: '12px' }}>{feat.title}</h3>
+                <p style={{ fontFamily: DS.bodyFont, color: DS.mid,
+                            lineHeight: 1.7, fontSize: '0.975rem' }}>{feat.description}</p>
+              </div>
+            </FadeIn>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── PROCESS ─────────────────────────────────────────────────────────────────
+function ProcessSection() {
+  const steps = [
+    { n: '01', title: 'Brief & Discovery', desc: 'En 24h agendamos una llamada para entender tu proyecto, equipo actual y objetivos de negocio.' },
+    { n: '02', title: 'Propuesta & Equipo', desc: 'En 48-72h presentamos la propuesta técnica con el equipo seleccionado y cronograma de entrega.' },
+    { n: '03', title: 'Sprint & Entrega', desc: 'Trabajamos en sprints de 2 semanas con demos continuas hasta lanzar tu producto.' },
+  ];
+
+  return (
+    <section style={{ background: DS.surface, padding: '96px 24px' }}>
+      <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+        <FadeIn>
+          <div style={{ textAlign: 'center', marginBottom: '64px' }}>
+            <h2 style={{ fontFamily: DS.headingFont, fontWeight: 800,
+                         fontSize: 'clamp(1.8rem,4vw,2.5rem)', color: DS.dark, marginBottom: '12px' }}>
+              Cómo lo hacemos — simple y sin sorpresas
+            </h2>
+            <p style={{ fontFamily: DS.bodyFont, color: DS.mid, fontSize: '1.05rem' }}>
+              Del brief al lanzamiento, siempre con comunicación directa
+            </p>
+          </div>
+        </FadeIn>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '32px' }}>
+          {steps.map((step, i) => (
+            <FadeIn key={i} delay={i * 120}>
+              <div style={{ position: 'relative', padding: '40px 32px',
+                            background: DS.bg, borderRadius: DS.brLg,
+                            border: \`2px solid \${i === 1 ? DS.primary : 'transparent'}\`,
+                            boxShadow: i === 1 ? \`0 8px 40px \${DS.primary}20\` : '0 2px 12px rgba(0,0,0,0.05)' }}>
+                <span style={{ display: 'inline-block', fontFamily: DS.headingFont, fontWeight: 800,
+                               fontSize: '3rem', color: \`\${DS.primary}20\`,
+                               lineHeight: 1, marginBottom: '16px' }}>{step.n}</span>
+                {i === 1 && (
+                  <span style={{ position: 'absolute', top: '20px', right: '20px',
+                                 background: DS.primary, color: '#fff', fontSize: '0.7rem',
+                                 fontWeight: 700, padding: '4px 12px', borderRadius: DS.brFull,
+                                 fontFamily: DS.bodyFont }}>MÁS POPULAR</span>
+                )}
+                <h3 style={{ fontFamily: DS.headingFont, fontWeight: 700, fontSize: '1.25rem',
+                             color: DS.dark, marginBottom: '12px' }}>{step.title}</h3>
+                <p style={{ fontFamily: DS.bodyFont, color: DS.mid, lineHeight: 1.7, fontSize: '0.95rem' }}>{step.desc}</p>
+              </div>
+            </FadeIn>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── TESTIMONIALS ────────────────────────────────────────────────────────────
+function TestimonialsSection() {
+  const testimonials = ${JSON.stringify(buildTestimonials())};
+
+  return (
+    <section style={{ background: DS.bg, padding: '96px 24px' }}>
+      <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
+        <FadeIn>
+          <h2 style={{ textAlign: 'center', fontFamily: DS.headingFont, fontWeight: 800,
+                       fontSize: 'clamp(1.8rem,4vw,2.5rem)', color: DS.dark, marginBottom: '56px' }}>
+            Lo que dicen nuestros clientes
+          </h2>
+        </FadeIn>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '28px' }}>
+          {testimonials.map((t, i) => (
+            <FadeIn key={i} delay={i * 100}>
+              <div style={{ background: DS.bg, borderRadius: DS.brLg, padding: '36px',
+                            border: '1px solid rgba(0,0,0,0.07)',
+                            boxShadow: '0 4px 24px rgba(0,0,0,0.06)', display: 'flex',
+                            flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {[1,2,3,4,5].map(s => (
+                    <span key={s} style={{ color: DS.accent, fontSize: '1.1rem' }}>★</span>
+                  ))}
+                </div>
+                <p style={{ fontFamily: DS.bodyFont, color: DS.mid, lineHeight: 1.75,
+                            fontSize: '0.975rem', flex: 1 }}>"{t.text}"</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px',
+                              paddingTop: '16px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '50%',
+                                background: \`linear-gradient(135deg, \${DS.primary}, \${DS.secondary})\`,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: '#fff', fontWeight: 700, fontFamily: DS.headingFont,
+                                fontSize: '1rem', flexShrink: 0 }}>
+                    {t.name.split(' ').map(w => w[0]).join('').slice(0,2)}
+                  </div>
+                  <div>
+                    <p style={{ fontFamily: DS.headingFont, fontWeight: 600, fontSize: '0.9rem',
+                                color: DS.dark, margin: 0 }}>{t.name}</p>
+                    <p style={{ fontFamily: DS.bodyFont, fontSize: '0.8rem', color: DS.mid, margin: 0 }}>
+                      {t.role} · {t.company}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </FadeIn>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── FAQ ─────────────────────────────────────────────────────────────────────
+function FAQSection() {
+  const [open, setOpen] = React.useState(null);
+  const faq = ${JSON.stringify(buildFAQ())};
+
+  return (
+    <section style={{ background: DS.surface, padding: '96px 24px' }}>
+      <div style={{ maxWidth: '760px', margin: '0 auto' }}>
+        <FadeIn>
+          <h2 style={{ textAlign: 'center', fontFamily: DS.headingFont, fontWeight: 800,
+                       fontSize: 'clamp(1.8rem,4vw,2.5rem)', color: DS.dark, marginBottom: '48px' }}>
+            Preguntas frecuentes
+          </h2>
+        </FadeIn>
+        {faq.map((item, i) => (
+          <FadeIn key={i} delay={i * 80}>
+            <div style={{ borderBottom: '1px solid rgba(0,0,0,0.07)', overflow: 'hidden' }}>
+              <button
+                onClick={() => setOpen(open === i ? null : i)}
+                style={{ width: '100%', display: 'flex', justifyContent: 'space-between',
+                         alignItems: 'center', padding: '24px 0', background: 'none',
+                         border: 'none', cursor: 'pointer', textAlign: 'left', gap: '16px' }}>
+                <span style={{ fontFamily: DS.headingFont, fontWeight: 600, fontSize: '1.05rem',
+                               color: DS.dark }}>{item.q}</span>
+                <span style={{ color: DS.primary, fontSize: '1.5rem', fontWeight: 300,
+                               transform: open === i ? 'rotate(45deg)' : 'rotate(0)',
+                               transition: 'transform 0.25s ease', flexShrink: 0 }}>+</span>
+              </button>
+              {open === i && (
+                <div style={{ padding: '0 0 24px', fontFamily: DS.bodyFont, color: DS.mid,
+                              lineHeight: 1.75, fontSize: '0.975rem' }}>
+                  {item.a}
+                </div>
+              )}
+            </div>
+          </FadeIn>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ─── CTA FINAL ───────────────────────────────────────────────────────────────
+function CTASection() {
+  const ctaStyle = {
+    padding: '112px 24px',
+    textAlign: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+    background: ${ctaBg
+      ? `\`linear-gradient(135deg, rgba(124,58,237,0.9), rgba(8,145,178,0.85)), url(${ctaBg}) center/cover no-repeat\``
+      : `\`linear-gradient(135deg, \${DS.primary} 0%, \${DS.secondary} 100%)\``
+    },
+  };
+
+  return (
+    <section id="contacto" style={ctaStyle}>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.15)' }} />
+      <div style={{ position: 'relative', maxWidth: '700px', margin: '0 auto' }}>
+        <FadeIn>
+          <h2 style={{ fontFamily: DS.headingFont, fontWeight: 800,
+                       fontSize: 'clamp(2rem,5vw,3rem)', color: '#fff',
+                       marginBottom: '20px', lineHeight: 1.15 }}>
+            Empieza hoy — sin riesgos
+          </h2>
+          <p style={{ fontFamily: DS.bodyFont, color: 'rgba(255,255,255,0.85)',
+                      fontSize: '1.15rem', marginBottom: '40px', lineHeight: 1.7 }}>
+            Cuéntanos tu proyecto y en menos de 24 horas te contactamos con una propuesta personalizada.
+          </p>
+          <a href="mailto:kevin@growby.tech" style={{
+            display: 'inline-block', padding: '18px 48px',
+            background: DS.accent, color: '#18181b',
+            borderRadius: DS.brFull, fontFamily: DS.bodyFont,
+            fontWeight: 700, fontSize: '1.1rem', textDecoration: 'none',
+            boxShadow: \`0 8px 40px \${DS.accent}55\`,
+            animation: 'ctaPulse 3s ease-in-out infinite',
+          }}>
+            Cuéntanos tu proyecto →
+          </a>
+          <p style={{ marginTop: '20px', fontFamily: DS.bodyFont,
+                      color: 'rgba(255,255,255,0.65)', fontSize: '0.85rem' }}>
+            Sin compromiso · Respondemos en menos de 24h · kevin@growby.tech
+          </p>
+        </FadeIn>
+      </div>
+    </section>
+  );
+}
+
+// ─── FOOTER ──────────────────────────────────────────────────────────────────
+function Footer() {
+  return (
+    <footer style={{ background: DS.dark, padding: '64px 24px 32px', fontFamily: DS.bodyFont }}>
+      <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                      gap: '48px', marginBottom: '48px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <span style={{ width: 36, height: 36, borderRadius: DS.brSm,
+                             background: \`linear-gradient(135deg, \${DS.primary}, \${DS.secondary})\`,
+                             display: 'flex', alignItems: 'center', justifyContent: 'center',
+                             color: '#fff', fontWeight: 800, fontSize: '1rem',
+                             fontFamily: DS.headingFont }}>G</span>
+              <span style={{ fontFamily: DS.headingFont, fontWeight: 700, fontSize: '1.2rem', color: '#fff' }}>GrowBy</span>
+            </div>
+            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.875rem', lineHeight: 1.7 }}>
+              Hub de especialistas digitales. Fundado en Lima, Perú. Operamos en toda LatAm y USA.
+            </p>
+          </div>
+          {[
+            { title: 'Servicios', links: ['Projects', 'Hiring', 'GrowBy AI', 'Staff Augmentation'] },
+            { title: 'Empresa', links: ['Sobre nosotros', 'Equipo', 'Blog', 'Casos de éxito'] },
+            { title: 'Contacto', links: ['kevin@growby.tech', '+51 994 440 840', 'Lima, Perú', 'growby.tech'] },
+          ].map((col, i) => (
+            <div key={i}>
+              <h4 style={{ fontFamily: DS.headingFont, fontWeight: 700, fontSize: '0.9rem',
+                           color: '#fff', marginBottom: '16px', textTransform: 'uppercase',
+                           letterSpacing: '0.08em' }}>{col.title}</h4>
+              {col.links.map(link => (
+                <a key={link} href="#" style={{ display: 'block', color: 'rgba(255,255,255,0.5)',
+                                               fontSize: '0.875rem', textDecoration: 'none',
+                                               marginBottom: '10px', transition: 'color 0.2s' }}
+                  onMouseEnter={e => e.target.style.color = DS.primary}
+                  onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.5)'}>
+                  {link}
+                </a>
+              ))}
+            </div>
+          ))}
+        </div>
+        <div style={{ paddingTop: '32px', borderTop: '1px solid rgba(255,255,255,0.08)',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      flexWrap: 'wrap', gap: '12px' }}>
+          <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.8rem' }}>
+            © 2026 Hub Negocios Creativos SAC · GrowBy · Lima, Perú
+          </p>
+          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.75rem' }}>
+            Rediseño generado por GrowBy Web Redesign Agent v0.3.0
+          </p>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+// ─── APP ROOT ────────────────────────────────────────────────────────────────
+function App() {
+  return (
+    <div style={{ fontFamily: DS.bodyFont }}>
+      <Header />
+      <HeroSection />
+      <ClientLogos />
+      <FeaturesSection />
+      <ProcessSection />
+      <TestimonialsSection />
+      <FAQSection />
+      <CTASection />
+      <Footer />
+    </div>
+  );
+}
+`;
+}
+
+// Wrap JSX in complete HTML document
+function buildHTML(jsxComponent, analysis, ds) {
+  const copy = analysis.seo_copy_analysis?.rewritten_copy || {};
+  const metaTitle = copy.meta_title || 'GrowBy — Agencia Digital | Diseño, Desarrollo e IA en LatAm';
+  const metaDesc = copy.meta_description || 'Especialistas digitales en diseño UX, desarrollo web, IA y marketing.';
+  const headingFont = ds.fonts.heading;
+  const bodyFont = ds.fonts.body;
+  const colors = ds.colors;
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${metaTitle}</title>
+  <meta name="description" content="${metaDesc}" />
+  <meta property="og:title" content="${metaTitle}" />
+  <meta property="og:description" content="${metaDesc}" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=${headingFont}:wght@400;600;700;800&family=${bodyFont}:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { background: ${colors.background}; }
+    :root {
+      --color-primary:   ${colors.primary};
+      --color-secondary: ${colors.secondary};
+      --color-accent:    ${colors.accent};
+      --color-dark:      ${colors.dark};
+      --color-neutral:   ${colors.neutral};
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes ctaPulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 8px 40px rgba(245,158,11,0.4); }
+      50%       { transform: scale(1.03); box-shadow: 0 12px 48px rgba(245,158,11,0.6); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+    @media (max-width: 768px) {
+      .grid-2-col { grid-template-columns: 1fr !important; }
+      nav a:not(:last-child) { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+${jsxComponent}
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(App));
+  </script>
+</body>
+</html>`;
+}
+
+// ─── MAIN ─────────────────────────────────────────────────────────────────────
+export async function generate(analysisPath) {
+  console.log('\n━━━ FASE 3: GENERACIÓN DEL ARTIFACT ━━━━━━━━━━━━━━━');
+  console.log(`  📄 Leyendo: ${analysisPath}`);
+
+  const analysis = JSON.parse(fs.readFileSync(analysisPath, 'utf8'));
+  const outputDir = path.dirname(analysisPath);
+  const ds = mapDesignSystem(analysis.ui_analysis?.design_system || {});
+  const imagePrompts = analysis.visual_analysis?.image_prompts || [];
+  const timestamp = analysis.meta?.timestamp || Date.now();
+
+  // Generate images
+  console.log(`\n  🖼️  Generando ${imagePrompts.length} imágenes via Gemini API...`);
+  const images = await generateAllImages(imagePrompts, timestamp);
+  const generatedCount = Object.values(images).filter(Boolean).length;
+  console.log(`  ✓ ${generatedCount}/${imagePrompts.length} imágenes generadas`);
+
+  // Build artifact
+  console.log('\n  🔨 Construyendo artifact React...');
+  const jsxComponent = buildJSXComponent(analysis, images, ds);
+
+  // Save redesign.jsx (component only)
+  const jsxPath = path.join(outputDir, 'redesign.jsx');
+  fs.writeFileSync(jsxPath, jsxComponent);
+  console.log(`  ✓ redesign.jsx (${Math.round(jsxComponent.length / 1024)}KB)`);
+
+  // Build and save index.html
+  const html = buildHTML(jsxComponent, analysis, ds);
+  const htmlPath = path.join(outputDir, 'index.html');
+  fs.writeFileSync(htmlPath, html);
+  console.log(`  ✓ index.html (${Math.round(html.length / 1024)}KB)`);
+
+  return { outputDir, jsxPath, htmlPath, imagesGenerated: generatedCount, totalImages: imagePrompts.length };
+}
+
+// CLI mode
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const analysisPath = process.argv[2];
+  if (!analysisPath) {
+    console.error('Uso: node scripts/generator.js <path/to/analysis.json>');
+    process.exit(1);
+  }
+  generate(path.resolve(analysisPath))
+    .then(r => console.log(`\n✅ Artifact generado en: ${r.outputDir}`))
+    .catch(err => { console.error('❌', err.message); process.exit(1); });
+}

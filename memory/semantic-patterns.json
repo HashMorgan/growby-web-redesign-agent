@@ -1,11 +1,102 @@
 {
-  "version": "1.0.0",
-  "last_updated": "",
+  "version": "1.1.0",
+  "last_updated": "2026-04-01",
   "patterns": {
-    "fintech": [],
-    "ecommerce": [],
-    "saas": [],
-    "healthcare": [],
+    "agency": [
+      {
+        "pattern": "hero_con_casos_de_exito_convierte_mejor_que_hero_lifestyle",
+        "confidence": 0.8,
+        "applications": 0,
+        "source": "base_knowledge",
+        "created": "2026-04-01"
+      },
+      {
+        "pattern": "numeros_de_impacto_above_fold_aumentan_credibilidad",
+        "confidence": 0.7,
+        "applications": 1,
+        "source": "user_feedback",
+        "created": "2026-04-01",
+        "last_updated": "2026-04-01"
+      },
+      {
+        "pattern": "cta_outcome_focused_supera_cta_generico",
+        "confidence": 0.9,
+        "applications": 0,
+        "source": "base_knowledge",
+        "created": "2026-04-01"
+      },
+      {
+        "pattern": "copy_propuesta_valor_efectivo_para_agency",
+        "confidence": 0.84,
+        "applications": 1,
+        "source": "user_feedback",
+        "created": "2026-04-01"
+      }
+    ],
+    "saas": [
+      {
+        "pattern": "free_trial_cta_convierte_3x_mas_que_demo_request",
+        "confidence": 0.85,
+        "applications": 0,
+        "source": "base_knowledge",
+        "created": "2026-04-01"
+      },
+      {
+        "pattern": "pricing_page_visible_en_nav_reduce_friccion",
+        "confidence": 0.8,
+        "applications": 0,
+        "source": "base_knowledge",
+        "created": "2026-04-01"
+      }
+    ],
+    "ecommerce": [
+      {
+        "pattern": "social_proof_cerca_del_add_to_cart_aumenta_conversion",
+        "confidence": 0.9,
+        "applications": 0,
+        "source": "base_knowledge",
+        "created": "2026-04-01"
+      },
+      {
+        "pattern": "urgency_indicators_efectivos_si_son_reales",
+        "confidence": 0.75,
+        "applications": 0,
+        "source": "base_knowledge",
+        "created": "2026-04-01"
+      }
+    ],
+    "fintech": [
+      {
+        "pattern": "trust_signals_regulatorios_criticos_above_fold",
+        "confidence": 0.9,
+        "applications": 0,
+        "source": "base_knowledge",
+        "created": "2026-04-01"
+      },
+      {
+        "pattern": "numeros_de_usuarios_o_transacciones_aumentan_confianza",
+        "confidence": 0.85,
+        "applications": 0,
+        "source": "base_knowledge",
+        "created": "2026-04-01"
+      }
+    ],
+    "healthcare": [
+      {
+        "pattern": "credenciales_medicas_visibles_reducen_friccion",
+        "confidence": 0.9,
+        "applications": 0,
+        "source": "base_knowledge",
+        "created": "2026-04-01"
+      },
+      {
+        "pattern": "foto_real_del_equipo_genera_mas_confianza_que_stock",
+        "confidence": 0.8,
+        "applications": 0,
+        "source": "base_knowledge",
+        "created": "2026-04-01"
+      }
+    ],
     "education": [],
     "real_estate": []
   }
