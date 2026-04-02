@@ -1,9 +1,16 @@
+/**
+ * generate.js — v2.0.0 Stitch-only pipeline
+ * Flujo: quickScrape → buildPrompt → Stitch → deployNetlify
+ */
+
 import express from 'express';
-import { exec, execSync } from 'child_process';
+import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { broadcast, activeJobs } from '../lib/broadcast.js';
+import { quickScrape } from '../../scripts/agents/quick-scrape.js';
+import { generateWithStitch } from '../../scripts/agents/stitch-simple.js';
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -28,144 +35,134 @@ function isValidUrl(string) {
   }
 }
 
+function buildPrompt(url, scrapeData) {
+  return `Rediseña el home web de ${url}. Usa el mismo contenido, colores y logos del sitio original. Mejora las imágenes según el rubro. Agrega en el footer: Powered by GrowBy con logo https://growby.tech/favicon.ico linking a growby.tech`;
+}
+
+async function deployToNetlify(htmlPath, clientSlug) {
+  try {
+    console.log('\n🚀 Deploying to Netlify...');
+
+    const siteName = `growby-${clientSlug.slice(0, 30)}-redesign`;
+    const result = execSync(
+      `netlify deploy --dir="${path.dirname(htmlPath)}" --prod --site-name=${siteName} --json`,
+      {
+        encoding: 'utf8',
+        timeout: 60000,
+        env: {
+          ...process.env,
+          NETLIFY_AUTH_TOKEN: process.env.NETLIFY_AUTH_TOKEN
+        }
+      }
+    );
+
+    const data = JSON.parse(result);
+    const netlifyUrl = data.url || data.deploy_url;
+
+    console.log(`   ✅ Deployed: ${netlifyUrl}`);
+    return netlifyUrl;
+
+  } catch (error) {
+    console.error(`   ❌ Netlify deploy failed: ${error.message.slice(0, 200)}`);
+    throw new Error('Netlify deploy failed');
+  }
+}
+
 async function runPipeline(url, jobId) {
   const clientSlug = slugify(url);
   const timestamp = new Date().toISOString().slice(0, 10);
-  const outputPath = path.join(PROJECT_ROOT, 'outputs', `${clientSlug}-${timestamp}`);
+  const outputDir = path.join(PROJECT_ROOT, 'outputs', `${clientSlug}-${timestamp}`);
 
-  // Emit progress updates
   const emit = (step, message, progress, extra = {}) => {
     broadcast({ jobId, step, message, progress, ...extra });
   };
 
   try {
-    emit('scraping', '🔍 Analizando sitio...', 10);
+    // PASO 1: Quick Scrape
+    emit('scraping', '🔍 Analizando sitio original...', 10);
+    const scrapeData = await quickScrape(url);
 
-    // Run orchestrator.js
-    const orchestratorPath = path.join(PROJECT_ROOT, 'scripts', 'orchestrator.js');
+    // PASO 2: Build Prompt
+    emit('prompt', '📝 Preparando prompt para Stitch...', 20);
+    const prompt = buildPrompt(url, scrapeData);
+    console.log(`\n📝 Prompt:\n${prompt}\n`);
 
-    const process = exec(`node "${orchestratorPath}" "${url}"`, {
-      cwd: PROJECT_ROOT,
-      maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+    // PASO 3: Generate with Stitch
+    emit('generating', '🎨 Generando con Stitch AI...', 30);
+
+    const html = await generateWithStitch(
+      prompt,
+      jobId,
+      (data) => emit(data.step, data.message, data.progress),
+      { url, scrapeData } // fallbackData
+    );
+
+    // PASO 4: Save HTML
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    const htmlPath = path.join(outputDir, 'index.html');
+    fs.writeFileSync(htmlPath, html, 'utf8');
+
+    console.log(`\n💾 Saved: ${htmlPath}`);
+    console.log(`   Size: ${(html.length / 1024).toFixed(1)} KB`);
+
+    // PASO 5: Deploy to Netlify
+    emit('deploying', '🚀 Publicando en Netlify...', 96);
+
+    let netlifyUrl;
+    try {
+      netlifyUrl = await deployToNetlify(htmlPath, clientSlug);
+    } catch (deployError) {
+      // Fallback: serve locally
+      const folder = path.basename(outputDir);
+      netlifyUrl = `/preview/${folder}/index.html`;
+      console.warn(`⚠️ Netlify failed, serving locally: ${netlifyUrl}`);
+    }
+
+    // Save job data
+    activeJobs.set(jobId, {
+      url,
+      outputPath: outputDir,
+      netlifyUrl,
+      htmlSize: html.length,
+      createdAt: new Date().toISOString()
     });
 
-    let buffer = '';
-
-    process.stdout.on('data', (data) => {
-      buffer += data.toString();
-      console.log(data.toString());
-
-      // Parse progress from orchestrator output
-      if (buffer.includes('FASE 1: SCRAPING')) {
-        emit('analysis', '🧠 Detectando industria y oportunidades...', 25);
-      } else if (buffer.includes('FASE 2: ANÁLISIS')) {
-        emit('ui_agent', '🎨 Generando design system...', 35);
-        setTimeout(() => emit('ux_agent', '📊 Analizando conversión (CRO)...', 45), 1000);
-        setTimeout(() => emit('seo_agent', '🔍 Optimizando SEO y copy...', 55), 2000);
-        setTimeout(() => emit('visual_agent', '🖼️ Preparando prompts visuales...', 65), 3000);
-      } else if (buffer.includes('FASE 3: GENERACIÓN')) {
-        emit('generating', '⚡ Construyendo rediseño React...', 75);
-      } else if (buffer.includes('Generating image')) {
-        const match = buffer.match(/(\d+)\/(\d+)/);
-        if (match) {
-          emit('images', `🖼️ Generando imágenes IA (${match[1]}/${match[2]})...`, 85);
-        }
-      } else if (buffer.includes('FASE 4: DEPLOY')) {
-        emit('deploying', '🚀 Publicando en Netlify...', 95);
-      }
+    // PASO 6: Complete
+    emit('complete', '✅ Rediseño listo', 100, {
+      netlifyUrl,
+      outputPath: outputDir,
+      htmlSize: html.length
     });
 
-    process.stderr.on('data', (data) => {
-      console.error(data.toString());
-    });
-
-    process.on('exit', (code) => {
-      if (code === 0) {
-        // Find the Netlify URL from orchestrator output
-        let netlifyUrl = null;
-        const urlMatch = buffer.match(/https:\/\/[a-z0-9-]+\.netlify\.app/);
-        if (urlMatch) netlifyUrl = urlMatch[0];
-
-        // Check if deploy-url.txt was written by orchestrator
-        const urlFile = path.join(outputPath, 'deploy-url.txt');
-        if (fs.existsSync(urlFile)) {
-          netlifyUrl = fs.readFileSync(urlFile, 'utf8').trim();
-        }
-
-        // Find actual output folder — orchestrator may have created it independently
-        let actualOutputPath = outputPath;
-        const outputsDir = path.join(PROJECT_ROOT, 'outputs');
-        if (fs.existsSync(outputsDir)) {
-          const folders = fs.readdirSync(outputsDir)
-            .filter(f => f.startsWith(clientSlug))
-            .sort()
-            .reverse();
-          if (folders.length > 0) {
-            actualOutputPath = path.join(outputsDir, folders[0]);
-          }
-        }
-
-        // If still no Netlify URL, try to deploy now
-        if (!netlifyUrl && fs.existsSync(path.join(actualOutputPath, 'index.html'))) {
-          try {
-            emit('deploying', '🚀 Publicando en Netlify...', 95);
-            const siteName = `growby-${clientSlug.slice(0, 30)}-redesign`;
-            const deployOut = execSync(
-              `netlify deploy --dir="${actualOutputPath}" --prod --site-name=${siteName} --json`,
-              { encoding: 'utf8', timeout: 60000 }
-            );
-            const deployData = JSON.parse(deployOut);
-            netlifyUrl = deployData.url || deployData.deploy_url || null;
-          } catch (deployErr) {
-            console.warn('Netlify deploy fallback failed:', deployErr.message.slice(0, 200));
-          }
-        }
-
-        // Final fallback: serve locally via /preview route — NEVER emit file://
-        if (!netlifyUrl) {
-          const folder = path.basename(actualOutputPath);
-          netlifyUrl = `/preview/${folder}/index.html`;
-        }
-
-        // Store job data
-        activeJobs.set(jobId, {
-          url,
-          outputPath: actualOutputPath,
-          netlifyUrl,
-          version: 1,
-          createdAt: new Date().toISOString()
-        });
-
-        emit('complete', '✅ Rediseño listo', 100, {
-          netlifyUrl,
-          outputPath: actualOutputPath
-        });
-      } else {
-        emit('error', `❌ Error: El pipeline falló con código ${code}`, 0);
-        activeJobs.delete(jobId);
-      }
-    });
+    console.log(`\n✅ Pipeline completado`);
+    console.log(`   URL: ${netlifyUrl}`);
 
   } catch (error) {
-    console.error('Error en pipeline:', error);
+    console.error('\n❌ Pipeline error:', error.message);
     emit('error', `❌ Error: ${error.message}`, 0);
     activeJobs.delete(jobId);
   }
 }
 
-// ── GET /stats — count of completed redesigns ────────────────────────────────
+// GET /stats — count of completed redesigns
 router.get('/stats', (req, res) => {
   try {
     const outputsDir = path.join(PROJECT_ROOT, 'outputs');
     if (!fs.existsSync(outputsDir)) return res.json({ redesigns: 0 });
+
     const entries = fs.readdirSync(outputsDir, { withFileTypes: true });
     const redesigns = entries.filter(e => e.isDirectory()).length;
+
     return res.json({ redesigns });
   } catch (_) {
     return res.json({ redesigns: 0 });
   }
 });
 
+// POST / — start redesign job
 router.post('/', async (req, res) => {
   const { url } = req.body;
 
@@ -176,7 +173,7 @@ router.post('/', async (req, res) => {
     });
   }
 
-  // Generate unique job ID
+  // Generate job ID
   const clientSlug = slugify(url);
   const timestamp = Date.now();
   const jobId = `${clientSlug}-${timestamp}`;
@@ -185,7 +182,7 @@ router.post('/', async (req, res) => {
   res.json({
     jobId,
     status: 'started',
-    message: 'Pipeline iniciado. Conecta via WebSocket para recibir actualizaciones.'
+    message: 'Pipeline v2.0.0 iniciado. Conecta via WebSocket para actualizaciones.'
   });
 
   // Run pipeline in background
