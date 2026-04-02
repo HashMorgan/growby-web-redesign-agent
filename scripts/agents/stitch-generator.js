@@ -94,6 +94,15 @@ export async function generateWithStitch(brief, metadata = {}, options = {}) {
         throw new Error('Stitch returned empty or invalid HTML');
       }
 
+      // Validar que sea HTML real, no JSON
+      if (html.trim().startsWith('{') || html.trim().startsWith('[')) {
+        throw new Error('Stitch returned JSON instead of HTML - need to implement HTML export method');
+      }
+
+      if (!html.includes('<!DOCTYPE') && !html.includes('<html') && !html.includes('<div')) {
+        throw new Error('Stitch response does not contain valid HTML tags');
+      }
+
       console.log('   ✅ Stitch generation successful');
       console.log(`   HTML size: ${(html.length / 1024).toFixed(1)} KB`);
 
