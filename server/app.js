@@ -116,12 +116,8 @@ wss.on('connection', (ws) => {
 
 // ── Protected API routes — Web Redesign Agent ────────────────────────────────
 import generateRoute from './routes/generate.js';
-import adjustRoute   from './routes/adjust.js';
-import approveRoute  from './routes/approve.js';
 
 app.use('/web-redesign/api/generate', requireAuth, generateRoute);
-app.use('/web-redesign/api/adjust',   requireAuth, adjustRoute);
-app.use('/web-redesign/api/approve',  requireAuth, approveRoute);
 
 // ── Health check (public — infra monitoring) ─────────────────────────────────
 app.get('/api/health', (req, res) =>

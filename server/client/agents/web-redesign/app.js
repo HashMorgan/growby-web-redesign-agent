@@ -1,6 +1,15 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// GROWBY WEB REDESIGN AGENT — CLIENT APP
+// GROWBY WEB REDESIGN AGENT v3.0.0 — CLIENT APP (3-STEP FLOW)
 // ═══════════════════════════════════════════════════════════════════════════
+
+// ─── STATE MANAGEMENT ──────────────────────────────────────────────────────
+const appState = {
+  currentStep: 1,
+  selectedMethod: null, // 'stitch' | 'pipeline'
+  url: '',
+  context: '',
+  jobId: null
+};
 
 // ─── WEBSOCKET MANAGER ─────────────────────────────────────────────────────
 class WebSocketManager {
@@ -44,241 +53,9 @@ class WebSocketManager {
     if (badge) {
       badge.className = `connection-badge ${connected ? 'connected' : 'disconnected'}`;
       badge.innerHTML = connected
-        ? '<div class="dot"></div><span>Conectado</span>'
-        : '<div class="dot"></div><span>Desconectado</span>';
+        ? '<div class="dot"></div><span class="hidden sm:inline">Conectado</span>'
+        : '<div class="dot"></div><span class="hidden sm:inline">Desconectado</span>';
     }
-  }
-
-  send(data) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(data));
-    }
-  }
-}
-
-// ─── JOB MANAGER ───────────────────────────────────────────────────────────
-class JobManager {
-  constructor() {
-    this.currentJobId = null;
-    this.versions = [];
-    this.currentVersion = 1;
-    this.netlifyUrls = new Map();
-  }
-
-  startJob(jobId) {
-    this.currentJobId = jobId;
-    this.versions = [{ number: 1, url: null, timestamp: new Date() }];
-    this.currentVersion = 1;
-  }
-
-  addVersion(url) {
-    const version = this.versions.length + 1;
-    this.versions.push({ number: version, url, timestamp: new Date() });
-    this.currentVersion = version;
-    this.netlifyUrls.set(version, url);
-    return version;
-  }
-
-  getCurrentUrl() {
-    const version = this.versions.find(v => v.number === this.currentVersion);
-    return version ? version.url : null;
-  }
-
-  getJobId() {
-    return this.currentJobId;
-  }
-}
-
-// ─── UI MANAGER ────────────────────────────────────────────────────────────
-class UIManager {
-  constructor() {
-    this.elements = {
-      idlePanel: document.getElementById('idlePanel'),
-      progressPanel: document.getElementById('progressPanel'),
-      resultPanel: document.getElementById('resultPanel'),
-      urlInput: document.getElementById('urlInput'),
-      generateBtn: document.getElementById('generateBtn'),
-      progressBar: document.getElementById('progressBar'),
-      currentMessage: document.getElementById('currentMessage'),
-      logContainer: document.getElementById('logContainer'),
-      netlifyUrl: document.getElementById('netlifyUrl'),
-      previewIframe: document.getElementById('previewIframe'),
-      previewSkeleton: document.getElementById('previewSkeleton'),
-      copyUrlBtn: document.getElementById('copyUrlBtn'),
-      openTabBtn: document.getElementById('openTabBtn'),
-      feedbackText: document.getElementById('feedbackText'),
-      adjustBtn: document.getElementById('adjustBtn'),
-      approveBtn: document.getElementById('approveBtn'),
-      approvalComment: document.getElementById('approvalComment'),
-      approvalMessage: document.getElementById('approvalMessage'),
-      versionBadge: document.getElementById('versionBadge'),
-      versionsPanel: document.getElementById('versionsPanel'),
-      stars: document.querySelectorAll('.star'),
-      ratingText: document.getElementById('ratingText'),
-    };
-    this.currentRating = 0;
-  }
-
-  showIdle() {
-    this.elements.idlePanel.classList.remove('hidden');
-    this.elements.progressPanel.classList.add('hidden');
-    this.elements.resultPanel.classList.add('hidden');
-  }
-
-  showProgress() {
-    this.elements.idlePanel.classList.add('hidden');
-    this.elements.progressPanel.classList.remove('hidden');
-    this.elements.resultPanel.classList.add('hidden');
-  }
-
-  showResult() {
-    this.elements.progressPanel.classList.add('hidden');
-    this.elements.resultPanel.classList.remove('hidden');
-  }
-
-  updateProgress(data) {
-    const { step, message, progress } = data;
-
-    // Update progress bar
-    this.elements.progressBar.style.width = `${progress}%`;
-    this.elements.currentMessage.textContent = message;
-
-    // Add to log
-    this.addLogEntry(message);
-
-    // Update step icons
-    const stepMap = {
-      scraping: 'scraping',
-      analysis: 'analysis',
-      ui_agent: 'design',
-      ux_agent: 'design',
-      seo_agent: 'design',
-      visual_agent: 'design',
-      generating: 'generating',
-      images: 'generating',
-      deploying: 'deploy'
-    };
-
-    const targetStep = stepMap[step];
-    if (targetStep) {
-      this.updateStepStatus(targetStep, progress >= 100 ? 'complete' : 'active');
-    }
-  }
-
-  updateStepStatus(stepId, status) {
-    const step = document.getElementById(`step-${stepId}`);
-    if (!step) return;
-
-    // Remove previous states
-    step.classList.remove('active', 'complete');
-
-    // Add new state
-    if (status === 'active') {
-      step.classList.add('active');
-      const statusEl = step.querySelector('.step-status');
-      if (statusEl) statusEl.textContent = '🔄';
-    } else if (status === 'complete') {
-      step.classList.add('complete');
-      const statusEl = step.querySelector('.step-status');
-      if (statusEl) statusEl.textContent = '✅';
-    }
-  }
-
-  addLogEntry(message) {
-    const time = new Date().toLocaleTimeString('es-PE', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-    const entry = document.createElement('div');
-    entry.className = 'log-entry';
-    entry.textContent = `[${time}] ${message}`;
-    this.elements.logContainer.appendChild(entry);
-    this.elements.logContainer.scrollTop = this.elements.logContainer.scrollHeight;
-  }
-
-  setGenerateButtonState(state) {
-    const btn = this.elements.generateBtn;
-    btn.classList.remove('loading');
-
-    switch (state) {
-      case 'loading':
-        btn.classList.add('loading');
-        btn.disabled = true;
-        btn.textContent = 'Analizando...';
-        break;
-      case 'complete':
-        btn.disabled = false;
-        btn.textContent = '✅ Listo — Generar otro';
-        btn.classList.remove('btn-primary');
-        btn.style.background = '#16a34a';
-        break;
-      default:
-        btn.disabled = false;
-        btn.textContent = 'Generar Rediseño';
-        btn.className = 'btn-primary w-full py-4 rounded-lg text-white font-semibold text-lg';
-    }
-  }
-
-  loadPreview(url) {
-    const iframe = this.elements.previewIframe;
-    const skeleton = this.elements.previewSkeleton;
-
-    if (skeleton) skeleton.style.display = 'block';
-
-    iframe.src = url;
-    iframe.onload = () => {
-      if (skeleton) skeleton.style.display = 'none';
-      iframe.classList.add('loaded');
-    };
-  }
-
-  updateVersions(versions, currentVersion) {
-    const panel = this.elements.versionsPanel;
-    if (!panel) return;
-
-    panel.innerHTML = versions.map(v => `
-      <span class="version ${v.number === currentVersion ? 'active' : ''}" data-version="${v.number}" data-url="${v.url || ''}">
-        v${v.number}${v.number === 1 ? ' — Original' : ' — Ajuste'}
-      </span>
-    `).join('');
-
-    panel.classList.remove('hidden');
-
-    // Add click handlers
-    panel.querySelectorAll('.version').forEach(el => {
-      el.addEventListener('click', () => {
-        const url = el.dataset.url;
-        if (url) {
-          this.loadPreview(url);
-          panel.querySelectorAll('.version').forEach(v => v.classList.remove('active'));
-          el.classList.add('active');
-        }
-      });
-    });
-  }
-
-  setupStarRating(onRatingChange) {
-    this.elements.stars.forEach(star => {
-      star.addEventListener('click', () => {
-        this.currentRating = parseInt(star.dataset.rating);
-
-        this.elements.stars.forEach((s, i) => {
-          if (i < this.currentRating) {
-            s.classList.add('active');
-            s.textContent = '★';
-          } else {
-            s.classList.remove('active');
-            s.textContent = '☆';
-          }
-        });
-
-        const ratingLabels = ['', 'Muy malo', 'Malo', 'Regular', 'Bueno', 'Excelente'];
-        this.elements.ratingText.textContent = ratingLabels[this.currentRating];
-
-        if (onRatingChange) onRatingChange(this.currentRating);
-      });
-    });
   }
 }
 
@@ -323,255 +100,301 @@ class ToastManager {
         setTimeout(() => toast.remove(), 300);
       }, duration);
     }
-
-    return toast;
   }
 
-  success(message, duration) {
-    return this.show(message, 'success', duration);
-  }
-
-  info(message, duration) {
-    return this.show(message, 'info', duration);
-  }
-
-  warning(message, duration) {
-    return this.show(message, 'warning', duration);
-  }
-
-  error(message, duration) {
-    return this.show(message, 'error', duration);
-  }
+  success(message, duration) { this.show(message, 'success', duration); }
+  error(message, duration) { this.show(message, 'error', duration); }
+  warning(message, duration) { this.show(message, 'warning', duration); }
+  info(message, duration) { this.show(message, 'info', duration); }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// APP INITIALIZATION
-// ═══════════════════════════════════════════════════════════════════════════
-
-const jobManager = new JobManager();
-const uiManager = new UIManager();
+// ─── INITIALIZATION ────────────────────────────────────────────────────────
 const toastManager = new ToastManager();
+const wsManager = new WebSocketManager(handleWebSocketMessage);
 
-// WebSocket message handler
-const wsManager = new WebSocketManager((data) => {
-  if (data.jobId !== jobManager.getJobId()) return;
+// ─── STEP NAVIGATION ───────────────────────────────────────────────────────
+function showStep(stepNumber) {
+  appState.currentStep = stepNumber;
 
-  uiManager.updateProgress(data);
+  // Hide all panels
+  document.getElementById('step1Panel').classList.add('hidden');
+  document.getElementById('step2Panel').classList.add('hidden');
+  document.getElementById('step3Panel').classList.add('hidden');
 
-  if (data.step === 'complete') {
-    handleComplete(data);
-  } else if (data.step === 'adjusted') {
-    handleAdjusted(data);
-  } else if (data.step === 'error') {
-    handleError(data);
-  }
+  // Show target panel
+  document.getElementById(`step${stepNumber}Panel`).classList.remove('hidden');
+}
+
+// ─── STEP 1: METHOD SELECTION ──────────────────────────────────────────────
+document.querySelectorAll('.method-card').forEach(card => {
+  card.addEventListener('click', () => {
+    const method = card.dataset.method;
+    appState.selectedMethod = method;
+
+    // Update label
+    const labels = {
+      stitch: '🎨 Stitch AI',
+      pipeline: '⚡ Pipeline GrowBy'
+    };
+    document.getElementById('selectedMethodLabel').textContent = labels[method];
+
+    // Advance to step 2
+    showStep(2);
+
+    // Enable validation
+    validateStep2();
+  });
 });
 
-// ─── EVENT HANDLERS ────────────────────────────────────────────────────────
+// Back to step 1
+document.getElementById('backToStep1').addEventListener('click', () => {
+  showStep(1);
+  appState.selectedMethod = null;
+});
 
-function handleComplete(data) {
-  uiManager.showResult();
-  uiManager.setGenerateButtonState('complete');
+// ─── STEP 2: URL + CONTEXT ─────────────────────────────────────────────────
+const urlInput = document.getElementById('urlInput');
+const contextInput = document.getElementById('contextInput');
+const generateBtn = document.getElementById('generateBtn');
 
-  const { netlifyUrl } = data;
+function validateStep2() {
+  const url = urlInput.value.trim();
+  const context = contextInput.value.trim();
+  const isValid = url.length > 0 && context.length > 10 &&
+    (url.startsWith('http://') || url.startsWith('https://'));
 
-  // Build the shareable URL — /preview/... needs origin prefix
-  const isNetlify = netlifyUrl && netlifyUrl.startsWith('https://');
-  const isPreview = netlifyUrl && netlifyUrl.startsWith('/preview/');
-  const shareUrl = isNetlify
-    ? netlifyUrl
-    : isPreview
-      ? window.location.origin + netlifyUrl
-      : null;
-
-  // iframe can use the netlifyUrl directly (works for both https:// and /preview/)
-  const previewSrc = isNetlify || isPreview ? netlifyUrl : null;
-
-  uiManager.elements.netlifyUrl.value = shareUrl || netlifyUrl || '';
-  if (previewSrc) uiManager.loadPreview(previewSrc);
-
-  jobManager.versions[0].url = shareUrl || netlifyUrl;
-  uiManager.updateVersions(jobManager.versions, 1);
-
-  // Update preview label with client hostname
-  try {
-    const labelEl = document.getElementById('previewLabel');
-    if (labelEl && currentJobUrl) {
-      labelEl.textContent = `Vista previa del rediseño — ${new URL(currentJobUrl).hostname}`;
-    }
-  } catch (_) {}
-
-  toastManager.success(isNetlify ? '✅ Rediseño publicado en Netlify' : '✅ Rediseño listo — previsualización disponible');
-
-  // Copy URL button
-  uiManager.elements.copyUrlBtn.onclick = async () => {
-    const url = uiManager.elements.netlifyUrl.value;
-    if (!url || url.startsWith('file://')) {
-      toastManager.error('URL no disponible aún');
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      toastManager.success('URL copiada al portapapeles', 2000);
-    } catch (_) {
-      uiManager.elements.netlifyUrl.select();
-      document.execCommand('copy');
-      toastManager.success('URL copiada', 2000);
-    }
-  };
-
-  // Open in new tab button
-  uiManager.elements.openTabBtn.onclick = () => {
-    const url = uiManager.elements.netlifyUrl.value;
-    if (!url || url.startsWith('file://')) {
-      toastManager.error('URL no disponible');
-      return;
-    }
-    window.open(url, '_blank', 'noopener,noreferrer');
-  };
+  generateBtn.disabled = !isValid;
 }
 
-function handleAdjusted(data) {
-  const version = jobManager.addVersion(data.netlifyUrl);
+urlInput.addEventListener('input', validateStep2);
+contextInput.addEventListener('input', validateStep2);
+urlInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter' && !generateBtn.disabled) generateBtn.click();
+});
 
-  uiManager.elements.netlifyUrl.value = data.netlifyUrl || '';
-  uiManager.loadPreview(data.netlifyUrl || '');
-  uiManager.elements.versionBadge.textContent = `Versión ${version}`;
-  uiManager.updateVersions(jobManager.versions, version);
+generateBtn.addEventListener('click', async () => {
+  const url = urlInput.value.trim();
+  const context = contextInput.value.trim();
 
-  uiManager.elements.feedbackText.value = '';
-
-  toastManager.info(`🔧 Ajuste aplicado — versión ${version} lista`);
-}
-
-function handleError(data) {
-  uiManager.elements.currentMessage.textContent = data.message;
-  uiManager.elements.currentMessage.style.color = 'var(--color-error)';
-  uiManager.setGenerateButtonState('idle');
-  toastManager.error(data.message || 'Error al procesar — intenta de nuevo');
-}
-
-// ─── GENERATE REDESIGN ─────────────────────────────────────────────────────
-
-let currentJobUrl = null;
-
-uiManager.elements.generateBtn.onclick = async () => {
-  const url = uiManager.elements.urlInput.value.trim();
-  console.log('Botón clickeado, URL:', url);
-
-  if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
-    toastManager.error('Por favor ingresa una URL válida que comience con http:// o https://');
+  if (!url || !context) {
+    toastManager.error('Por favor completa todos los campos');
     return;
   }
 
-  uiManager.setGenerateButtonState('loading');
+  appState.url = url;
+  appState.context = context;
+
+  // Disable button
+  generateBtn.disabled = true;
+  generateBtn.textContent = 'Iniciando...';
 
   try {
+    // Call API
     const response = await fetch('/web-redesign/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url })
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      currentJobUrl = url;
-      jobManager.startJob(data.jobId);
-      uiManager.showProgress();
-    } else {
-      toastManager.error(data.error || 'Error al iniciar el rediseño');
-      uiManager.setGenerateButtonState('idle');
-    }
-  } catch (error) {
-    toastManager.error('Error de conexión: ' + error.message);
-    uiManager.setGenerateButtonState('idle');
-  }
-};
-
-// ─── ADJUST REDESIGN ───────────────────────────────────────────────────────
-
-uiManager.elements.adjustBtn.onclick = async () => {
-  const feedback = uiManager.elements.feedbackText.value.trim();
-
-  if (!feedback) {
-    toastManager.warning('Por favor describe qué cambiarías');
-    return;
-  }
-
-  uiManager.elements.adjustBtn.disabled = true;
-  uiManager.elements.adjustBtn.textContent = '⏳ Aplicando...';
-
-  try {
-    const response = await fetch('/web-redesign/api/adjust', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jobId: jobManager.getJobId(), feedback })
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      toastManager.error(data.error || 'Error al aplicar ajuste');
-    }
-  } catch (error) {
-    toastManager.error('Error de conexión: ' + error.message);
-  } finally {
-    uiManager.elements.adjustBtn.disabled = false;
-    uiManager.elements.adjustBtn.textContent = 'Aplicar Ajuste';
-  }
-};
-
-// ─── APPROVE REDESIGN ──────────────────────────────────────────────────────
-
-uiManager.setupStarRating((rating) => {
-  uiManager.elements.approveBtn.disabled = rating === 0;
-});
-
-uiManager.elements.approveBtn.onclick = async () => {
-  if (uiManager.currentRating === 0) {
-    toastManager.warning('Por favor selecciona una calificación');
-    return;
-  }
-
-  uiManager.elements.approveBtn.disabled = true;
-  uiManager.elements.approveBtn.textContent = '⏳ Guardando...';
-
-  try {
-    const response = await fetch('/web-redesign/api/approve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        jobId: jobManager.getJobId(),
-        score: uiManager.currentRating,
-        feedback: uiManager.elements.approvalComment.value.trim() || null
+        url,
+        method: appState.selectedMethod,
+        context
       })
     });
 
     const data = await response.json();
 
     if (response.ok) {
-      uiManager.elements.approvalMessage.classList.remove('hidden');
-      uiManager.elements.approvalMessage.textContent = data.message || '🧠 El agente aprendió de este rediseño';
-      uiManager.elements.approveBtn.textContent = '✅ Aprobado';
+      appState.jobId = data.jobId;
 
-      toastManager.success('🧠 Aprendizaje guardado correctamente');
+      // Setup steps based on method
+      setupProgressSteps(appState.selectedMethod);
+
+      // Show step 3 (progress)
+      showStep(3);
+      document.getElementById('progressSection').classList.remove('hidden');
+      document.getElementById('resultSection').classList.add('hidden');
+
     } else {
-      toastManager.error(data.error || 'Error al guardar aprobación');
-      uiManager.elements.approveBtn.disabled = false;
-      uiManager.elements.approveBtn.textContent = '✅ Aprobar y Guardar Aprendizaje';
+      toastManager.error(data.error || 'Error al iniciar el rediseño');
+      generateBtn.disabled = false;
+      generateBtn.textContent = 'Generar Rediseño →';
     }
   } catch (error) {
     toastManager.error('Error de conexión: ' + error.message);
-    uiManager.elements.approveBtn.disabled = false;
-    uiManager.elements.approveBtn.textContent = '✅ Aprobar y Guardar Aprendizaje';
+    generateBtn.disabled = false;
+    generateBtn.textContent = 'Generar Rediseño →';
   }
-};
+});
 
-// ─── FULLSCREEN BUTTON ─────────────────────────────────────────────────────
+// ─── STEP 3: PROGRESS ──────────────────────────────────────────────────────
+function setupProgressSteps(method) {
+  const stepsContainer = document.getElementById('stepsContainer');
 
-document.getElementById('fullscreenBtn')?.addEventListener('click', () => {
-  const iframe = uiManager.elements.previewIframe;
+  const stepsConfig = {
+    stitch: [
+      { id: 'analyzing', icon: '🔍', label: 'Analizando' },
+      { id: 'generating', icon: '🎨', label: 'Stitch AI' },
+      { id: 'deploying', icon: '🚀', label: 'Publicando' }
+    ],
+    pipeline: [
+      { id: 'scraping', icon: '🔍', label: 'Scraping' },
+      { id: 'analysis', icon: '🧠', label: 'Análisis' },
+      { id: 'design', icon: '🎨', label: 'Diseño' },
+      { id: 'deploying', icon: '🚀', label: 'Publicando' }
+    ]
+  };
+
+  const steps = stepsConfig[method] || stepsConfig.stitch;
+
+  stepsContainer.innerHTML = steps.map((step, i) => `
+    <div class="step" id="step-${step.id}">
+      <div class="step-icon">${step.icon}</div>
+      <div class="step-label">${step.label}</div>
+      <div class="step-status">⏳</div>
+    </div>
+    ${i < steps.length - 1 ? '<div class="flex-1 h-0.5 bg-gray-700 mx-2"></div>' : ''}
+  `).join('');
+}
+
+function updateProgress(data) {
+  const { step, message, progress } = data;
+
+  // Update progress bar
+  document.getElementById('progressBar').style.width = `${progress}%`;
+  document.getElementById('currentMessage').textContent = message;
+
+  // Add to log
+  addLogEntry(message);
+
+  // Update step status
+  const stepMap = {
+    scraping: 'scraping',
+    analyzing: 'analyzing',
+    prompt: 'analyzing',
+    generating: 'generating',
+    deploying: 'deploying'
+  };
+
+  const targetStep = stepMap[step];
+  if (targetStep) {
+    updateStepStatus(targetStep, progress >= 100 ? 'complete' : 'active');
+  }
+}
+
+function updateStepStatus(stepId, status) {
+  const step = document.getElementById(`step-${stepId}`);
+  if (!step) return;
+
+  step.classList.remove('active', 'complete');
+
+  if (status === 'active') {
+    step.classList.add('active');
+    const statusEl = step.querySelector('.step-status');
+    if (statusEl) statusEl.textContent = '🔄';
+  } else if (status === 'complete') {
+    step.classList.add('complete');
+    const statusEl = step.querySelector('.step-status');
+    if (statusEl) statusEl.textContent = '✅';
+  }
+}
+
+function addLogEntry(message) {
+  const time = new Date().toLocaleTimeString('es-PE', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.textContent = `[${time}] ${message}`;
+  const container = document.getElementById('logContainer');
+  container.appendChild(entry);
+  container.scrollTop = container.scrollHeight;
+}
+
+// ─── WEBSOCKET MESSAGE HANDLER ─────────────────────────────────────────────
+function handleWebSocketMessage(data) {
+  if (data.jobId !== appState.jobId) return;
+
+  updateProgress(data);
+
+  if (data.step === 'complete') {
+    handleComplete(data);
+  } else if (data.step === 'error') {
+    handleError(data);
+  }
+}
+
+function handleComplete(data) {
+  // Hide progress, show result
+  document.getElementById('progressSection').classList.add('hidden');
+  document.getElementById('resultSection').classList.remove('hidden');
+
+  const { netlifyUrl } = data;
+
+  // Build shareable URL
+  const isNetlify = netlifyUrl && netlifyUrl.startsWith('https://');
+  const isPreview = netlifyUrl && netlifyUrl.startsWith('/preview/');
+  const shareUrl = isNetlify
+    ? netlifyUrl
+    : isPreview
+      ? window.location.origin + netlifyUrl
+      : netlifyUrl;
+
+  const previewSrc = isNetlify || isPreview ? netlifyUrl : null;
+
+  document.getElementById('netlifyUrl').value = shareUrl || '';
+  if (previewSrc) loadPreview(previewSrc);
+
+  toastManager.success('✅ Rediseño completado y publicado');
+}
+
+function handleError(data) {
+  document.getElementById('currentMessage').textContent = data.message;
+  document.getElementById('currentMessage').style.color = 'var(--color-error)';
+  toastManager.error(data.message || 'Error al procesar');
+}
+
+// ─── RESULT ACTIONS ────────────────────────────────────────────────────────
+function loadPreview(url) {
+  const iframe = document.getElementById('previewIframe');
+  const skeleton = document.getElementById('previewSkeleton');
+
+  if (skeleton) skeleton.style.display = 'block';
+
+  iframe.src = url;
+  iframe.onload = () => {
+    if (skeleton) skeleton.style.display = 'none';
+    iframe.classList.add('loaded');
+  };
+}
+
+document.getElementById('copyUrlBtn').addEventListener('click', async () => {
+  const url = document.getElementById('netlifyUrl').value;
+  if (!url) {
+    toastManager.error('URL no disponible');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    toastManager.success('URL copiada al portapapeles', 2000);
+  } catch (_) {
+    document.getElementById('netlifyUrl').select();
+    document.execCommand('copy');
+    toastManager.success('URL copiada', 2000);
+  }
+});
+
+document.getElementById('openTabBtn').addEventListener('click', () => {
+  const url = document.getElementById('netlifyUrl').value;
+  if (!url) {
+    toastManager.error('URL no disponible');
+    return;
+  }
+  window.open(url, '_blank', 'noopener,noreferrer');
+});
+
+document.getElementById('fullscreenBtn').addEventListener('click', () => {
+  const iframe = document.getElementById('previewIframe');
   if (iframe.requestFullscreen) {
     iframe.requestFullscreen();
   } else if (iframe.webkitRequestFullscreen) {
@@ -581,12 +404,26 @@ document.getElementById('fullscreenBtn')?.addEventListener('click', () => {
   }
 });
 
-// ─── ENTER KEY HANDLER ─────────────────────────────────────────────────────
+document.getElementById('newRedesignBtn').addEventListener('click', () => {
+  // Reset state
+  appState.currentStep = 1;
+  appState.selectedMethod = null;
+  appState.url = '';
+  appState.context = '';
+  appState.jobId = null;
 
-uiManager.elements.urlInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') {
-    uiManager.elements.generateBtn.click();
-  }
+  // Clear inputs
+  urlInput.value = '';
+  contextInput.value = '';
+  generateBtn.disabled = true;
+  generateBtn.textContent = 'Generar Rediseño →';
+
+  // Reset progress
+  document.getElementById('progressBar').style.width = '0%';
+  document.getElementById('logContainer').innerHTML = '';
+
+  // Show step 1
+  showStep(1);
 });
 
-console.log('✅ GrowBy Redesign Agent — Cliente inicializado');
+console.log('✅ GrowBy Redesign Agent v3.0.0 — Cliente inicializado');

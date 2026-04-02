@@ -75,7 +75,110 @@ async function deployToNetlify(htmlPath, clientSlug, siteName = null) {
   }
 }
 
-async function runPipeline(url, jobId) {
+async function runStitchPipeline(url, context, jobId) {
+  const clientSlug = slugify(url);
+  const timestamp = new Date().toISOString().slice(0, 10);
+  const outputDir = path.join(PROJECT_ROOT, 'outputs', `${clientSlug}-${timestamp}`);
+
+  const emit = (step, message, progress, extra = {}) => {
+    broadcast({ jobId, step, message, progress, ...extra });
+  };
+
+  try {
+    // PASO 1: Quick Scrape (básico)
+    emit('analyzing', '🔍 Analizando sitio original...', 10);
+    const scrapeData = await quickScrape(url);
+
+    // PASO 2: Build Prompt with context
+    emit('analyzing', '📝 Construyendo prompt para Stitch...', 20);
+    const basePrompt = `Rediseña el home web de ${url}. Usa el mismo contenido, colores y logos del sitio original. Mejora las imágenes según el rubro. Agrega en el footer: Powered by GrowBy con logo https://growby.tech/favicon.ico linking a growby.tech`;
+    const fullPrompt = context
+      ? `${basePrompt}\n\nObjetivo adicional del rediseño:\n${context}`
+      : basePrompt;
+
+    console.log(`\n📝 Stitch Prompt:\n${fullPrompt}\n`);
+
+    // PASO 3: Generate with Stitch
+    emit('generating', '🎨 Generando con Stitch AI...', 30);
+
+    const result = await generateWithStitch(
+      fullPrompt,
+      jobId,
+      (data) => emit(data.step, data.message, data.progress),
+      { url, scrapeData }
+    );
+
+    const html = result.html;
+    const projectId = result.projectId;
+
+    // PASO 4: Save HTML
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    const htmlPath = path.join(outputDir, 'index.html');
+    fs.writeFileSync(htmlPath, html, 'utf8');
+
+    console.log(`\n💾 Saved: ${htmlPath}`);
+    console.log(`   Size: ${(html.length / 1024).toFixed(1)} KB`);
+
+    // PASO 5: Deploy to Netlify
+    emit('deploying', '🚀 Publicando en Netlify...', 96);
+
+    let netlifyUrl, siteName;
+    try {
+      const deployResult = await deployToNetlify(htmlPath, clientSlug);
+      netlifyUrl = deployResult.netlifyUrl;
+      siteName = deployResult.siteName;
+    } catch (deployError) {
+      const folder = path.basename(outputDir);
+      netlifyUrl = `/preview/${folder}/index.html`;
+      siteName = null;
+      console.warn(`⚠️ Netlify failed, serving locally: ${netlifyUrl}`);
+    }
+
+    // Save Stitch metadata
+    const stitchMeta = {
+      projectId,
+      siteName,
+      url,
+      context,
+      method: 'stitch',
+      timestamp: new Date().toISOString()
+    };
+    fs.writeFileSync(
+      path.join(outputDir, 'stitch-meta.json'),
+      JSON.stringify(stitchMeta, null, 2)
+    );
+
+    // Save job data
+    activeJobs.set(jobId, {
+      url,
+      method: 'stitch',
+      outputPath: outputDir,
+      netlifyUrl,
+      htmlSize: html.length,
+      createdAt: new Date().toISOString()
+    });
+
+    // PASO 6: Complete
+    emit('complete', '✅ Rediseño listo', 100, {
+      netlifyUrl,
+      outputPath: outputDir,
+      htmlSize: html.length
+    });
+
+    console.log(`\n✅ Stitch pipeline completado`);
+    console.log(`   URL: ${netlifyUrl}`);
+
+  } catch (error) {
+    console.error('\n❌ Stitch pipeline error:', error.message);
+    emit('error', `❌ Error: ${error.message}`, 0);
+    activeJobs.delete(jobId);
+  }
+}
+
+async function runPipeline(url, jobId, context = '') {
   const clientSlug = slugify(url);
   const timestamp = new Date().toISOString().slice(0, 10);
   const outputDir = path.join(PROJECT_ROOT, 'outputs', `${clientSlug}-${timestamp}`);
@@ -90,15 +193,18 @@ async function runPipeline(url, jobId) {
     const scrapeData = await quickScrape(url);
 
     // PASO 2: Build Prompt
-    emit('prompt', '📝 Preparando prompt para Stitch...', 20);
-    const prompt = buildPrompt(url, scrapeData);
-    console.log(`\n📝 Prompt:\n${prompt}\n`);
+    emit('prompt', '📝 Preparando prompt...', 20);
+    const basePrompt = buildPrompt(url, scrapeData);
+    const fullPrompt = context
+      ? `${basePrompt}\n\nContexto adicional del cliente:\n${context}`
+      : basePrompt;
+    console.log(`\n📝 Prompt:\n${fullPrompt}\n`);
 
-    // PASO 3: Generate with Stitch
-    emit('generating', '🎨 Generando con Stitch AI...', 30);
+    // PASO 3: Generate with Stitch (Pipeline usa Stitch por ahora)
+    emit('generating', '🎨 Generando diseño...', 30);
 
     const result = await generateWithStitch(
-      prompt,
+      fullPrompt,
       jobId,
       (data) => emit(data.step, data.message, data.progress),
       { url, scrapeData } // fallbackData
@@ -134,21 +240,24 @@ async function runPipeline(url, jobId) {
       console.warn(`⚠️ Netlify failed, serving locally: ${netlifyUrl}`);
     }
 
-    // Save Stitch metadata for future adjustments
-    const stitchMeta = {
+    // Save metadata for future reference
+    const metadata = {
       projectId,
       siteName,
       url,
+      context,
+      method: 'pipeline',
       timestamp: new Date().toISOString()
     };
     fs.writeFileSync(
       path.join(outputDir, 'stitch-meta.json'),
-      JSON.stringify(stitchMeta, null, 2)
+      JSON.stringify(metadata, null, 2)
     );
 
     // Save job data
     activeJobs.set(jobId, {
       url,
+      method: 'pipeline',
       outputPath: outputDir,
       netlifyUrl,
       htmlSize: html.length,
@@ -189,12 +298,19 @@ router.get('/stats', (req, res) => {
 
 // POST / — start redesign job
 router.post('/', async (req, res) => {
-  const { url } = req.body;
+  const { url, method = 'stitch', context = '' } = req.body;
 
   // Validate URL
   if (!url || !isValidUrl(url)) {
     return res.status(400).json({
       error: 'URL inválida. Debe comenzar con http:// o https://'
+    });
+  }
+
+  // Validate method
+  if (!['stitch', 'pipeline'].includes(method)) {
+    return res.status(400).json({
+      error: 'Método inválido. Debe ser "stitch" o "pipeline"'
     });
   }
 
@@ -207,12 +323,17 @@ router.post('/', async (req, res) => {
   res.json({
     jobId,
     status: 'started',
-    message: 'Pipeline v2.0.0 iniciado. Conecta via WebSocket para actualizaciones.'
+    method,
+    message: `${method === 'stitch' ? 'Stitch AI' : 'Pipeline GrowBy'} iniciado. Conecta via WebSocket para actualizaciones.`
   });
 
   // Run pipeline in background
   setImmediate(() => {
-    runPipeline(url, jobId);
+    if (method === 'stitch') {
+      runStitchPipeline(url, context, jobId);
+    } else {
+      runPipeline(url, jobId, context);
+    }
   });
 });
 
