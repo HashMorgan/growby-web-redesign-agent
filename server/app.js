@@ -127,7 +127,7 @@ app.use('/web-redesign/api', requireAuth, generateRoute); // For /stats and /his
 app.get('/api/health', (req, res) =>
   res.json({
     status: 'ok',
-    version: '0.5.0',
+    version: '3.2.0',
     platform: 'GrowBy Agents',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
@@ -152,14 +152,14 @@ app.use((req, res) => res.status(404).json({ error: 'No encontrado' }));
 // ── Start ─────────────────────────────────────────────────────────────────────
 server.listen(PORT, () => {
   console.log('\n╔══════════════════════════════════════════════════╗');
-  console.log('║   🚀 GrowBy Agents Platform — v0.5.0             ║');
-  console.log('║   Auth + Security hardening active               ║');
+  console.log('║   🚀 GrowBy Agents Platform — v3.2.0             ║');
+  console.log('║   Self-hosted dual URLs (demo + redesigns)       ║');
   console.log('╚══════════════════════════════════════════════════╝\n');
   console.log(`🌐 Dashboard:   http://localhost:${PORT}/`);
   console.log(`🎨 Redesign:    http://localhost:${PORT}/web-redesign`);
   console.log(`🔒 Auth:        bcrypt + sessions + helmet + rate-limit`);
   console.log(`📡 WebSocket:   ws://localhost:${PORT}`);
-  console.log(`🔗 Dominio:     agents.growby.digital\n`);
+  console.log(`🔗 Production:  agents.growby.digital\n`);
 });
 
 export default app;
