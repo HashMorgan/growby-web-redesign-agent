@@ -66,7 +66,7 @@ export async function generateWithStitch(prompt, jobId = null, broadcast = null,
     // Intentar extraer HTML del resultado
     let html;
     try {
-      html = extractHTML(screenResult);
+      html = await extractHTML(screenResult);
     } catch (extractError) {
       // Stitch no retornó HTML - usar fallback con design system
       console.warn(`   ⚠️ ${extractError.message}`);
@@ -100,20 +100,31 @@ export async function generateWithStitch(prompt, jobId = null, broadcast = null,
 /**
  * Extrae HTML del response de Stitch
  */
-function extractHTML(response) {
-  // Prioridad de extracción
+async function extractHTML(response) {
+  // 1. Buscar htmlCode.downloadUrl en outputComponents
+  if (response.outputComponents && Array.isArray(response.outputComponents)) {
+    for (const component of response.outputComponents) {
+      // Buscar en design.screens[].htmlCode
+      if (component.design?.screens) {
+        for (const screen of component.design.screens) {
+          if (screen.htmlCode?.downloadUrl) {
+            console.log('   📥 Descargando HTML desde URL...');
+            const htmlResponse = await fetch(screen.htmlCode.downloadUrl);
+            if (htmlResponse.ok) {
+              return await htmlResponse.text();
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Fallback: buscar HTML directo (paths antiguos)
   const sources = [
-    // 1. Método getHtml() si existe
     response.html,
     response.getHtml?.(),
-
-    // 2. outputComponents
     response.outputComponents,
-
-    // 3. content
     response.content,
-
-    // 4. code
     response.code,
   ];
 
