@@ -193,7 +193,7 @@ export async function run(url) {
     console.log(`   ${brief}`);
 
     const stitchHtml = await generateWithStitch(brief, metadata, {
-      timeout: 30000, // 30 segundos
+      timeout: 180000, // 3 minutos (Stitch puede tardar en generar)
     });
 
     // Si Stitch tuvo éxito, guardar el output

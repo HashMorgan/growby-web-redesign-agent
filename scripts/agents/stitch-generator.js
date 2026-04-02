@@ -2,7 +2,7 @@
  * stitch-generator.js
  *
  * Integración con Stitch MCP para generación de diseños.
- * Timeout de 30s — si falla → throw error para activar fallback.
+ * Timeout de 300s — si falla → throw error para activar fallback.
  */
 
 import 'dotenv/config';
@@ -21,10 +21,10 @@ import { StitchToolClient } from '@google/stitch-sdk';
  */
 export async function generateWithStitch(brief, metadata = {}, options = {}) {
   const {
-    projectId = '9889776658400342226', // Project ID creado anteriormente
+    projectId = null, // Se creará uno nuevo si no se provee
     deviceType = 'DESKTOP',
     modelId = 'GEMINI_3_FLASH',
-    timeout = 30000, // 30 segundos
+    timeout = 300000, // 5 minutos
   } = options;
 
   console.log('\n🎨 Stitch Generator');
@@ -33,70 +33,80 @@ export async function generateWithStitch(brief, metadata = {}, options = {}) {
   console.log(`   Model: ${modelId}`);
   console.log(`   Timeout: ${timeout}ms`);
 
-  // Leer API key desde .mcp.json
-  const mcpConfigPath = path.join(process.cwd(), '.mcp.json');
-  let apiKey;
-
-  try {
-    const mcpConfig = JSON.parse(fs.readFileSync(mcpConfigPath, 'utf8'));
-    apiKey = mcpConfig.mcpServers?.stitch?.headers?.['X-Goog-Api-Key'];
-
-    if (!apiKey) {
-      throw new Error('Stitch API key not found in .mcp.json');
-    }
-  } catch (error) {
-    console.error(`   ❌ Error reading .mcp.json: ${error.message}`);
-    throw new Error('Stitch API key not configured - using fallback generator');
+  // Verificar API key
+  const apiKey = process.env.STITCH_API_KEY;
+  if (!apiKey) {
+    throw new Error('STITCH_API_KEY not found in environment - using fallback generator');
   }
 
   let client;
 
   try {
+    // Inicializar cliente con timeout
+    console.log('   📡 Initializing Stitch SDK...');
+    client = new StitchToolClient({
+      apiKey,
+      timeout
+    });
+
     // Usar timeout con Promise.race
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error(`Stitch timeout after ${timeout}ms`)), timeout)
     );
 
     const generatePromise = (async () => {
-      console.log('   📡 Calling Stitch SDK...');
+      // PASO 1: Crear proyecto si no existe
+      let actualProjectId = projectId;
 
-      // Inicializar cliente con API key
-      client = new StitchToolClient({ apiKey });
-
-      // Generar screen usando tool client
-      const result = await client.callTool('generate_screen_from_text', {
-        prompt: brief,
-        projectId: projectId,
-        deviceType: deviceType,
-        modelId: modelId,
-      });
-
-      // El resultado debería contener el HTML o el screen ID
-      // Necesitamos obtener el HTML del screen generado
-      if (!result || !result.screenId) {
-        throw new Error('Stitch returned invalid response');
+      if (!actualProjectId) {
+        console.log('   🔨 Creating Stitch project...');
+        const projectResult = await client.callTool('create_project', {
+          title: `${metadata.company || 'Web'} Landing Page`
+        });
+        // Extraer ID del name (formato: "projects/123")
+        actualProjectId = projectResult.name.split('/')[1];
+        console.log(`   ✅ Project created: ${actualProjectId}`);
+      } else {
+        console.log(`   📁 Using existing project: ${actualProjectId}`);
       }
 
-      // Obtener HTML del screen
-      const htmlResult = await client.callTool('get_html', {
-        screenId: result.screenId,
-        projectId: projectId,
+      // PASO 2: Generar screen con el brief
+      console.log('   🎨 Generating screen from text...');
+      const screenResult = await client.callTool('generate_screen_from_text', {
+        projectId: actualProjectId,
+        prompt: brief,
+        deviceType,
+        modelId,
       });
 
-      const html = htmlResult.html || htmlResult.content || JSON.stringify(htmlResult);
+      if (!screenResult) {
+        throw new Error('Stitch returned null/undefined result');
+      }
 
-      console.log('✅ Stitch generation successful');
+      console.log('   ✅ Screen generated successfully');
+      console.log('   📊 Response keys:', Object.keys(screenResult).join(', '));
+
+      // PASO 3: Extraer HTML del resultado
+      // Stitch devuelve el HTML directamente en outputComponents
+      const html = extractHTMLFromScreen(screenResult);
+
+      if (!html || html.length < 100) {
+        throw new Error('Stitch returned empty or invalid HTML');
+      }
+
+      console.log('   ✅ Stitch generation successful');
       console.log(`   HTML size: ${(html.length / 1024).toFixed(1)} KB`);
 
-      return html;
+      return { html, projectId: actualProjectId, sessionId: screenResult.sessionId };
     })();
 
     // Race entre generación y timeout
-    const html = await Promise.race([generatePromise, timeoutPromise]);
+    const result = await Promise.race([generatePromise, timeoutPromise]);
 
-    return html;
+    return result.html;
 
   } catch (error) {
+    console.error(`   ❌ Stitch error: ${error.message}`);
     throw error;
   } finally {
     // Cerrar cliente si fue inicializado
@@ -107,53 +117,81 @@ export async function generateWithStitch(brief, metadata = {}, options = {}) {
 }
 
 /**
- * Extrae el HTML del response de Stitch
- * @param {*} outputComponents - Response de Stitch
+ * Extrae HTML del objeto screen de Stitch
+ * @param {object} screen - Screen object de Stitch (puede ser el resultado de generate_screen_from_text)
  * @returns {string} HTML extraído
  */
-function extractHTML(outputComponents) {
-  // Caso 1: String directo
-  if (typeof outputComponents === 'string') {
-    return outputComponents;
+function extractHTMLFromScreen(screen) {
+  // Caso 1: outputComponents array (formato de generate_screen_from_text)
+  if (Array.isArray(screen.outputComponents)) {
+    console.log(`   📦 Found ${screen.outputComponents.length} output components`);
+
+    // Intentar extraer código HTML de los componentes
+    let htmlParts = [];
+
+    for (const component of screen.outputComponents) {
+      // Cada componente puede tener diferentes estructuras
+      if (typeof component === 'string') {
+        htmlParts.push(component);
+      } else if (component.code) {
+        htmlParts.push(component.code);
+      } else if (component.html) {
+        htmlParts.push(component.html);
+      } else if (component.content) {
+        htmlParts.push(typeof component.content === 'string' ? component.content : JSON.stringify(component.content));
+      }
+    }
+
+    if (htmlParts.length > 0) {
+      const combinedHtml = htmlParts.join('\n\n');
+      console.log(`   ✅ Extracted HTML from ${htmlParts.length} components`);
+      return combinedHtml;
+    }
   }
 
-  // Caso 2: Objeto con propiedad html
-  if (outputComponents.html) {
-    return outputComponents.html;
+  // Caso 2: HTML directo en propiedad html
+  if (screen.html) {
+    return screen.html;
   }
 
-  // Caso 3: Objeto con propiedad code
-  if (outputComponents.code) {
-    return outputComponents.code;
+  // Caso 3: HTML en code property
+  if (screen.code) {
+    return screen.code;
   }
 
-  // Caso 4: Array de componentes (combinar)
-  if (Array.isArray(outputComponents)) {
-    return outputComponents
-      .map(comp => {
-        if (typeof comp === 'string') return comp;
-        if (comp.html) return comp.html;
-        if (comp.code) return comp.code;
-        return '';
-      })
-      .join('\n');
+  // Caso 4: outputComponents como string
+  if (screen.outputComponents && typeof screen.outputComponents === 'string') {
+    return screen.outputComponents;
   }
 
-  // Caso 5: Objeto con estructura compleja - intentar serializar
-  if (typeof outputComponents === 'object') {
-    console.warn('   ⚠️  Unexpected Stitch response format, attempting to extract...');
-    console.log(JSON.stringify(outputComponents, null, 2));
+  // Caso 5: HTML en content
+  if (screen.content) {
+    if (typeof screen.content === 'string') {
+      return screen.content;
+    }
+    if (screen.content.html) {
+      return screen.content.html;
+    }
+  }
 
-    // Si tiene alguna propiedad que parezca HTML
-    for (const key of Object.keys(outputComponents)) {
-      const value = outputComponents[key];
-      if (typeof value === 'string' && value.includes('<html')) {
+  // Caso 6: Estructura desconocida - intentar buscar HTML en propiedades
+  console.warn('   ⚠️  Unexpected screen format, attempting to extract HTML...');
+  console.log('   Screen keys:', Object.keys(screen));
+
+  for (const key of Object.keys(screen)) {
+    const value = screen[key];
+    if (typeof value === 'string') {
+      if (value.includes('<!DOCTYPE') || value.includes('<html') || value.includes('<div')) {
+        console.log(`   ℹ️  Found HTML-like content in property: ${key}`);
         return value;
       }
     }
   }
 
-  throw new Error('Unable to extract HTML from Stitch response');
+  // Si no encontramos HTML, retornar JSON serializado del screen
+  // para debugging (el assembler manejará esto)
+  console.warn('   ⚠️  No HTML found, returning screen object as JSON');
+  return JSON.stringify(screen, null, 2);
 }
 
 /**
@@ -176,14 +214,14 @@ export function saveStitchOutput(html, outputDir, metadata = {}) {
     metadataPath,
     JSON.stringify({
       generated_at: new Date().toISOString(),
-      generator: 'stitch-mcp',
+      generator: 'stitch-sdk',
       ...metadata
     }, null, 2),
     'utf8'
   );
 
-  console.log(`   Saved: ${htmlPath}`);
-  console.log(`   Saved: ${metadataPath}`);
+  console.log(`   💾 Saved: ${htmlPath}`);
+  console.log(`   💾 Saved: ${metadataPath}`);
 
   return htmlPath;
 }
