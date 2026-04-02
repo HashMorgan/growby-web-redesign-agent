@@ -27,6 +27,13 @@ router.post('/', requireAuth, async (req, res) => {
     return res.status(404).json({ error: `Output no encontrado: ${jobId}` });
   }
 
+  // Load Stitch metadata
+  const stitchMetaPath = path.join(outputDir, 'stitch-meta.json');
+  let stitchMeta = null;
+  if (fs.existsSync(stitchMetaPath)) {
+    stitchMeta = JSON.parse(fs.readFileSync(stitchMetaPath, 'utf8'));
+  }
+
   // Respond immediately
   res.json({ jobId, status: 'adjusting' });
 
@@ -47,25 +54,82 @@ router.post('/', requireAuth, async (req, res) => {
     }
 
     const version = (parseInt(htmlFiles[0].match(/v(\d+)/)?.[1] || '1')) + 1;
-    const latestHtmlPath = path.join(outputDir, htmlFiles[0]);
-    const currentHtml = fs.readFileSync(latestHtmlPath, 'utf8');
 
-    // Use Claude API for adjustments
-    if (!process.env.ANTHROPIC_API_KEY) {
-      throw new Error('ANTHROPIC_API_KEY not configured - ajustes requieren Claude API');
+    let adjustedHtml;
+
+    // OPCIÓN A: Usar el mismo proyecto de Stitch (preferido)
+    if (stitchMeta && stitchMeta.projectId && process.env.STITCH_API_KEY) {
+      broadcast({ jobId, step: 'adjusting', message: '🎨 Ajustando con Stitch AI...', progress: 40 });
+
+      const { StitchToolClient } = await import('@google/stitch-sdk');
+      const client = new StitchToolClient({
+        apiKey: process.env.STITCH_API_KEY,
+        timeout: 120000
+      });
+
+      try {
+        // Prompt de ajuste basado en feedback del usuario
+        const adjustPrompt = `${stitchMeta.url} — Ajuste: ${feedback}`;
+
+        const screenResult = await client.callTool('generate_screen_from_text', {
+          projectId: stitchMeta.projectId,
+          prompt: adjustPrompt,
+          deviceType: 'DESKTOP'
+        });
+
+        // Extraer HTML del resultado
+        broadcast({ jobId, step: 'adjusting', message: '📥 Extrayendo HTML...', progress: 70 });
+
+        if (screenResult.outputComponents && Array.isArray(screenResult.outputComponents)) {
+          for (const component of screenResult.outputComponents) {
+            if (component.design?.screens) {
+              for (const screen of component.design.screens) {
+                if (screen.htmlCode?.downloadUrl) {
+                  const htmlResponse = await fetch(screen.htmlCode.downloadUrl);
+                  if (htmlResponse.ok) {
+                    adjustedHtml = await htmlResponse.text();
+                    break;
+                  }
+                }
+              }
+            }
+            if (adjustedHtml) break;
+          }
+        }
+
+        await client.close();
+
+        if (!adjustedHtml) {
+          throw new Error('Stitch no retornó HTML en el ajuste');
+        }
+
+      } catch (stitchErr) {
+        console.warn('⚠️ Stitch adjust falló, usando fallback Claude API:', stitchErr.message);
+        // Fallback a Claude API
+        stitchMeta = null; // Para que use la opción B abajo
+      }
     }
 
-    broadcast({ jobId, step: 'adjusting', message: '🤖 Claude modificando el diseño...', progress: 40 });
+    // OPCIÓN B: Fallback con Claude API
+    if (!adjustedHtml) {
+      if (!process.env.ANTHROPIC_API_KEY) {
+        throw new Error('ANTHROPIC_API_KEY not configured - ajustes requieren Claude API o Stitch');
+      }
 
-    const { default: Anthropic } = await import('@anthropic-ai/sdk');
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      broadcast({ jobId, step: 'adjusting', message: '🤖 Claude modificando el diseño...', progress: 40 });
 
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 8000,
-      messages: [{
-        role: 'user',
-        content: `Eres un experto en rediseño web. Tienes este HTML de un rediseño web y el siguiente feedback del cliente.
+      const latestHtmlPath = path.join(outputDir, htmlFiles[0]);
+      const currentHtml = fs.readFileSync(latestHtmlPath, 'utf8');
+
+      const { default: Anthropic } = await import('@anthropic-ai/sdk');
+      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+      const response = await client.messages.create({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 8000,
+        messages: [{
+          role: 'user',
+          content: `Eres un experto en rediseño web. Tienes este HTML de un rediseño web y el siguiente feedback del cliente.
 Modifica ÚNICAMENTE las secciones mencionadas en el feedback preservando todo el resto del código intacto.
 Devuelve SOLO el HTML completo modificado, sin explicaciones, sin markdown, sin bloques de código.
 
@@ -74,13 +138,14 @@ ${feedback}
 
 HTML ACTUAL:
 ${currentHtml.substring(0, 50000)}`
-      }]
-    });
+        }]
+      });
 
-    const adjustedHtml = response.content[0].text;
+      adjustedHtml = response.content[0].text;
 
-    if (!adjustedHtml.includes('<!DOCTYPE') && !adjustedHtml.includes('<html')) {
-      throw new Error('Claude no devolvió HTML válido');
+      if (!adjustedHtml.includes('<!DOCTYPE') && !adjustedHtml.includes('<html')) {
+        throw new Error('Claude no devolvió HTML válido');
+      }
     }
 
     // Save versioned file
@@ -102,11 +167,11 @@ ${currentHtml.substring(0, 50000)}`
 
     broadcast({ jobId, step: 'adjusting', message: '🚀 Publicando versión ajustada...', progress: 88 });
 
-    // Re-deploy to Netlify
+    // Re-deploy to Netlify (usa el mismo siteName si existe)
     let netlifyUrl = `/preview/${jobId}/index.html`;
     if (process.env.NETLIFY_AUTH_TOKEN) {
       try {
-        const siteName = `growby-${jobId.replace(/-\d{4}-\d{2}-\d{2}$/, '')}`;
+        const siteName = stitchMeta?.siteName || `growby-${jobId.replace(/-\d{13}$/, '')}`;
         const deployOut = execSync(
           `npx netlify-cli deploy --dir="${outputDir}" --prod --site-name="${siteName}" 2>&1`,
           { encoding: 'utf8', env: { ...process.env }, timeout: 60000 }

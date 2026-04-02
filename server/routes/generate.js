@@ -39,11 +39,18 @@ function buildPrompt(url, scrapeData) {
   return `Rediseña el home web de ${url}. Usa el mismo contenido, colores y logos del sitio original. Mejora las imágenes según el rubro. Agrega en el footer: Powered by GrowBy con logo https://growby.tech/favicon.ico linking a growby.tech`;
 }
 
-async function deployToNetlify(htmlPath, clientSlug) {
+async function deployToNetlify(htmlPath, clientSlug, siteName = null) {
   try {
     console.log('\n🚀 Deploying to Netlify...');
 
-    const siteName = `growby-${clientSlug.slice(0, 30)}-redesign`;
+    // Si no se provee siteName, generar uno único con fecha/hora
+    if (!siteName) {
+      const now = new Date();
+      const dateStr = now.toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
+      const timeStr = now.toTimeString().slice(0, 5).replace(/:/g, ''); // HHmm
+      siteName = `growby-${clientSlug.slice(0, 20)}-${dateStr}-${timeStr}`;
+    }
+
     const result = execSync(
       `netlify deploy --dir="${path.dirname(htmlPath)}" --prod --site-name=${siteName} --json`,
       {
@@ -60,7 +67,7 @@ async function deployToNetlify(htmlPath, clientSlug) {
     const netlifyUrl = data.url || data.deploy_url;
 
     console.log(`   ✅ Deployed: ${netlifyUrl}`);
-    return netlifyUrl;
+    return { netlifyUrl, siteName };
 
   } catch (error) {
     console.error(`   ❌ Netlify deploy failed: ${error.message.slice(0, 200)}`);
@@ -90,12 +97,15 @@ async function runPipeline(url, jobId) {
     // PASO 3: Generate with Stitch
     emit('generating', '🎨 Generando con Stitch AI...', 30);
 
-    const html = await generateWithStitch(
+    const result = await generateWithStitch(
       prompt,
       jobId,
       (data) => emit(data.step, data.message, data.progress),
       { url, scrapeData } // fallbackData
     );
+
+    const html = result.html;
+    const projectId = result.projectId;
 
     // PASO 4: Save HTML
     if (!fs.existsSync(outputDir)) {
@@ -111,15 +121,30 @@ async function runPipeline(url, jobId) {
     // PASO 5: Deploy to Netlify
     emit('deploying', '🚀 Publicando en Netlify...', 96);
 
-    let netlifyUrl;
+    let netlifyUrl, siteName;
     try {
-      netlifyUrl = await deployToNetlify(htmlPath, clientSlug);
+      const deployResult = await deployToNetlify(htmlPath, clientSlug);
+      netlifyUrl = deployResult.netlifyUrl;
+      siteName = deployResult.siteName;
     } catch (deployError) {
       // Fallback: serve locally
       const folder = path.basename(outputDir);
       netlifyUrl = `/preview/${folder}/index.html`;
+      siteName = null;
       console.warn(`⚠️ Netlify failed, serving locally: ${netlifyUrl}`);
     }
+
+    // Save Stitch metadata for future adjustments
+    const stitchMeta = {
+      projectId,
+      siteName,
+      url,
+      timestamp: new Date().toISOString()
+    };
+    fs.writeFileSync(
+      path.join(outputDir, 'stitch-meta.json'),
+      JSON.stringify(stitchMeta, null, 2)
+    );
 
     // Save job data
     activeJobs.set(jobId, {

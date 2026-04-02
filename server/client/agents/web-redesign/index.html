@@ -14,30 +14,30 @@
 <body>
   <!-- Header -->
   <header class="border-b border-gray-800 bg-[#03081B] sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <img src="/isotipo-32.webp" alt="GrowBy" style="width:36px;height:36px;border-radius:8px;object-fit:contain;">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between flex-wrap gap-2">
+      <div class="flex items-center gap-2 sm:gap-3">
+        <img src="/isotipo-32.webp" alt="GrowBy" class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg object-contain">
         <div>
           <a href="/" class="text-xs text-gray-500 hover:text-[#5D55D7] transition-colors block mb-0.5">← Agents</a>
-          <h1 class="text-lg font-semibold leading-tight">Web Redesign</h1>
+          <h1 class="text-base sm:text-lg font-semibold leading-tight">Web Redesign</h1>
         </div>
       </div>
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2 sm:gap-4 flex-wrap">
         <div id="connectionBadge" class="connection-badge connected">
           <div class="dot"></div>
-          <span>Conectado</span>
+          <span class="hidden sm:inline">Conectado</span>
         </div>
-        <div class="flex items-center gap-2 bg-green-900/30 text-green-400 px-3 py-1.5 rounded-full text-sm">
+        <div class="hidden sm:flex items-center gap-2 bg-green-900/30 text-green-400 px-3 py-1.5 rounded-full text-sm">
           <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
           <span>v1.0.0 · En línea</span>
         </div>
         <!-- User + logout -->
         <div class="flex items-center gap-2">
-          <span id="userBadge" class="text-sm text-gray-400 flex items-center gap-1">
+          <span id="userBadge" class="text-xs sm:text-sm text-gray-400 flex items-center gap-1">
             <span>👤</span><span id="usernameDisplay"></span>
           </span>
           <button id="logoutBtn"
-            class="text-sm text-gray-500 hover:text-red-400 transition-colors px-2 py-1 rounded"
+            class="text-xs sm:text-sm text-gray-500 hover:text-red-400 transition-colors px-2 py-1 rounded"
             title="Cerrar sesión">
             Salir
           </button>
@@ -46,12 +46,12 @@
     </div>
   </header>
 
-  <main class="max-w-7xl mx-auto px-6 py-12">
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
 
     <!-- Panel Idle (antes de generar) -->
-    <div id="idlePanel" class="grid-bg rounded-2xl p-16 text-center">
-      <h2 class="text-4xl font-bold mb-4">Genera un rediseño en minutos</h2>
-      <p class="text-gray-400 text-lg mb-10 max-w-2xl mx-auto">
+    <div id="idlePanel" class="grid-bg rounded-2xl p-6 sm:p-12 lg:p-16 text-center">
+      <h2 class="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4">Genera un rediseño en minutos</h2>
+      <p class="text-gray-400 text-base sm:text-lg mb-8 sm:mb-10 max-w-2xl mx-auto">
         Pega la URL del prospecto y el agente analiza, diseña y publica automáticamente
       </p>
 
@@ -60,11 +60,13 @@
           id="urlInput"
           type="url"
           placeholder="https://cliente.com"
-          class="w-full px-6 py-4 rounded-lg bg-gray-900 border border-gray-700 text-white text-lg mb-6 focus:outline-none focus:border-[#5D55D7] transition"
+          class="w-full px-4 sm:px-6 py-3 sm:py-4 rounded-lg bg-gray-900 border border-gray-700 text-white text-base sm:text-lg mb-4 sm:mb-6 focus:outline-none focus:border-[#5D55D7] transition"
+          style="font-size: 16px;"
         />
         <button
           id="generateBtn"
-          class="btn-primary w-full py-4 rounded-lg text-white font-semibold text-lg"
+          class="btn-primary w-full py-3 sm:py-4 rounded-lg text-white font-semibold text-base sm:text-lg"
+          style="min-height: 44px;"
         >
           Generar Rediseño
         </button>
@@ -73,8 +75,8 @@
 
     <!-- Panel de Progreso -->
     <div id="progressPanel" class="hidden">
-      <div class="bg-gray-900 rounded-2xl p-8 mb-6">
-        <h3 class="text-2xl font-bold mb-6">Generando rediseño...</h3>
+      <div class="bg-gray-900 rounded-2xl p-4 sm:p-6 lg:p-8 mb-4 sm:mb-6">
+        <h3 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Generando rediseño...</h3>
 
         <!-- Barra de progreso -->
         <div class="bg-gray-800 rounded-full h-3 mb-8 overflow-hidden">
@@ -136,32 +138,35 @@
 
     <!-- Panel de Resultado -->
     <div id="resultPanel" class="hidden">
-      <div class="bg-gray-900 rounded-2xl p-8 mb-6">
-        <div class="flex items-center justify-between mb-6">
-          <h3 class="text-2xl font-bold">✅ Rediseño completado</h3>
-          <div id="versionBadge" class="text-sm text-gray-400">Versión 1</div>
+      <div class="bg-gray-900 rounded-2xl p-4 sm:p-6 lg:p-8 mb-4 sm:mb-6">
+        <div class="flex items-center justify-between mb-4 sm:mb-6 flex-wrap gap-2">
+          <h3 class="text-xl sm:text-2xl font-bold">✅ Rediseño completado</h3>
+          <div id="versionBadge" class="text-xs sm:text-sm text-gray-400">Versión 1</div>
         </div>
 
         <!-- Versions Panel -->
         <div id="versionsPanel" class="hidden"></div>
 
         <!-- URL y acciones -->
-        <div class="flex items-center gap-3 mb-6">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
           <input
             id="netlifyUrl"
             type="text"
             readonly
-            class="flex-1 px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-white"
+            class="flex-1 px-3 sm:px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm sm:text-base"
+            style="font-size: 14px; min-height: 44px;"
           />
           <button
             id="copyUrlBtn"
-            class="px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-lg transition"
+            class="px-4 sm:px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-lg transition text-sm sm:text-base whitespace-nowrap"
+            style="min-height: 44px;"
           >
             📋 Copiar URL
           </button>
           <button
             id="openTabBtn"
-            class="px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-lg transition"
+            class="px-4 sm:px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-lg transition text-sm sm:text-base whitespace-nowrap"
+            style="min-height: 44px;"
           >
             🔗 Ver en nueva pestaña
           </button>
@@ -192,47 +197,51 @@
       </div>
 
       <!-- Panel de Feedback -->
-      <div class="bg-gray-900 rounded-2xl p-8 mb-6">
-        <h4 class="text-xl font-semibold mb-4">¿Algo que ajustar?</h4>
+      <div class="bg-gray-900 rounded-2xl p-4 sm:p-6 lg:p-8 mb-4 sm:mb-6">
+        <h4 class="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">¿Algo que ajustar?</h4>
         <textarea
           id="feedbackText"
           placeholder="Describe qué cambiarías (ej: el hero necesita más impacto, cambiar color del botón a amarillo)..."
-          class="w-full px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-white mb-4 resize-none"
+          class="w-full px-3 sm:px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-white mb-3 sm:mb-4 resize-none"
           rows="4"
+          style="font-size: 16px;"
         ></textarea>
         <button
           id="adjustBtn"
-          class="btn-primary px-8 py-3 rounded-lg text-white font-semibold"
+          class="btn-primary px-6 sm:px-8 py-3 rounded-lg text-white font-semibold w-full sm:w-auto"
+          style="min-height: 44px;"
         >
           Aplicar Ajuste
         </button>
       </div>
 
       <!-- Panel de Aprobación -->
-      <div class="bg-gray-900 rounded-2xl p-8">
-        <h4 class="text-xl font-semibold mb-4">¿El rediseño cumple las expectativas?</h4>
+      <div class="bg-gray-900 rounded-2xl p-4 sm:p-6 lg:p-8">
+        <h4 class="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">¿El rediseño cumple las expectativas?</h4>
 
         <!-- Estrellas -->
-        <div class="flex items-center gap-2 mb-6">
-          <span class="star" data-rating="1">☆</span>
-          <span class="star" data-rating="2">☆</span>
-          <span class="star" data-rating="3">☆</span>
-          <span class="star" data-rating="4">☆</span>
-          <span class="star" data-rating="5">☆</span>
-          <span id="ratingText" class="ml-4 text-gray-400"></span>
+        <div class="flex items-center gap-1 sm:gap-2 mb-4 sm:mb-6 flex-wrap">
+          <span class="star" data-rating="1" style="min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;">☆</span>
+          <span class="star" data-rating="2" style="min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;">☆</span>
+          <span class="star" data-rating="3" style="min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;">☆</span>
+          <span class="star" data-rating="4" style="min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;">☆</span>
+          <span class="star" data-rating="5" style="min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;">☆</span>
+          <span id="ratingText" class="ml-2 sm:ml-4 text-sm sm:text-base text-gray-400"></span>
         </div>
 
         <textarea
           id="approvalComment"
           placeholder="Comentario adicional (opcional)..."
-          class="w-full px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-white mb-4 resize-none"
+          class="w-full px-3 sm:px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-white mb-3 sm:mb-4 resize-none"
           rows="3"
+          style="font-size: 16px;"
         ></textarea>
 
         <button
           id="approveBtn"
-          class="btn-success px-8 py-3 rounded-lg text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+          class="btn-success px-6 sm:px-8 py-3 rounded-lg text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
           disabled
+          style="min-height: 44px;"
         >
           ✅ Aprobar y Guardar Aprendizaje
         </button>

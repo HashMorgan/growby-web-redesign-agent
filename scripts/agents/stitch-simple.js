@@ -85,7 +85,7 @@ export async function generateWithStitch(prompt, jobId = null, broadcast = null,
     emit('✅ HTML generado', 95);
     console.log(`   📊 Tamaño: ${(html.length / 1024).toFixed(1)} KB`);
 
-    return html;
+    return { html, projectId };
 
   } catch (error) {
     console.error(`❌ Error en Stitch: ${error.message}`);
