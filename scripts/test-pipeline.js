@@ -56,7 +56,7 @@ const emitProgress = (step, message, progress) => {
     console.log(`   Contiene colores reales: ${html.includes(scrapeData.brand?.colors?.primary || '#000') ? '✅' : '❌'}`);
     console.log(`   Idioma español: ${html.includes('lang="es"') ? '✅' : '❌'}`);
     console.log(`   Responsive: ${html.includes('viewport') ? '✅' : '❌'}`);
-    console.log(`   Animations: ${html.includes('fadeInUp') ? '✅' : '❌'}`);
+    console.log(`   Animations: ${html.includes('fadeSlideUp') || html.includes('hero-animate') ? '✅' : '❌'}`);
     console.log(`   Accessibility: ${html.includes('prefers-reduced-motion') ? '✅' : '❌'}`);
 
     // Guardar resultado
