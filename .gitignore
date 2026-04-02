@@ -11,3 +11,4 @@ db/
 *.log
 package-lock.json
 .mcp.json
+.firecrawl/

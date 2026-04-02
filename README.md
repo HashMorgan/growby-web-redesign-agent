@@ -1,14 +1,14 @@
 # GrowBy Web Redesign Agent
 
 ![Status](https://img.shields.io/badge/status-Production-green)
-![Version](https://img.shields.io/badge/version-v3.2.0-blue)
-![Stack](https://img.shields.io/badge/stack-Stitch%20AI%20%2B%20Express%20%2B%20WebSocket%20%2B%20React%20%2B%20Tailwind-purple)
+![Version](https://img.shields.io/badge/version-v3.5.0-blue)
+![Stack](https://img.shields.io/badge/stack-Stitch%20AI%20%2B%20Skills%20%2B%20Express%20%2B%20WebSocket%20%2B%20React%20%2B%20Tailwind-purple)
 
 Agente de IA especializado en rediseño web automático. Recibe la URL del home de un prospecto y genera, en una sola sesión, un rediseño completo de UI + UX + SEO + Visual como artifact React compartible — listo para presentar al cliente o entregar al equipo de desarrollo.
 
 ---
 
-## Arquitectura v3.2.0 — Plataforma Web Multi-Agente
+## Arquitectura v3.5.0 — Plataforma Web Multi-Agente + Skills Reales
 
 **URL producción:** https://agents.growby.digital
 
@@ -40,8 +40,18 @@ FASE 2 — GENERACIÓN (según método elegido)
      stitch-simple.js → Stitch SDK (Google Gemini 3 Flash)
      → outputs/[jobId]/index.html
   
-  ⚡ PIPELINE GROWBY:
-     html-builder.js → Templates React + Tailwind
+  ⚡ PIPELINE GROWBY (v3.5.0 — Usa Skills Reales):
+     PASO 1 — Deep scraping con Firecrawl skill
+       • Extrae: HTML, markdown, colores CSS, imágenes, estructura
+     PASO 2 — Análisis con 4 agentes basados en SKILL.md
+       • UI Agent (ui-ux-pro-max) → Design system por industria
+       • UX Agent (page-cro) → 7 dimensiones CRO + layout
+       • SEO/Copy Agent (copywriting + seo-audit) → Copy persuasivo
+       • Animate Agent (animate) → Estrategia de animaciones
+     PASO 3 — Generación HTML usando outputs de skills
+       • NO hardcoded content
+       • TODO en español
+       • Colores, fonts, copy basados en análisis real
      → outputs/[jobId]/index.html
 
 FASE 3 — PUBLICACIÓN (self-hosted, 0 segundos)
@@ -64,9 +74,25 @@ MEMORIA — Feedback loop continuo
 - **Backend:** Express.js + WebSocket (ws)
 - **Frontend:** Vanilla JS + Tailwind CDN
 - **Auth:** bcrypt + express-session + SQLite
-- **Design:** Stitch AI SDK / HTML builder templates
+- **Design:** Stitch AI SDK / Pipeline GrowBy con skills
 - **Deploy:** PM2 + DigitalOcean Droplet + Nginx
 - **Hosting:** Self-hosted dual URLs (/demo público + /redesigns privado)
+- **Skills:** 175 skills instalados (11MB) via skills.sh
+
+### Skills del Pipeline GrowBy (v3.5.0)
+
+Pipeline GrowBy ahora usa 5 skills profesionales en su análisis:
+
+| Skill | Propósito | Output |
+|-------|-----------|--------|
+| **firecrawl** | Deep scraping (HTML + markdown + colors + images) | Datos completos del sitio |
+| **ui-ux-pro-max** | Design system por industria (50+ estilos, 161 paletas, 57 font pairings) | Colores, tipografía, spacing, effects |
+| **page-cro** | Análisis CRO en 7 dimensiones (value prop, CTAs, trust signals) | Layout, jerarquía visual, quick wins |
+| **copywriting** | Copy persuasivo (clarity > cleverness, benefits > features) | H1, subheadlines, CTAs, sections |
+| **seo-audit** | SEO técnico (meta tags, headings, keywords) | Title, meta description, estructura H1-H3 |
+| **animate** | Estrategia de animaciones en 4 capas (hero, feedback, transitions, delight) | Animaciones, timings, easing curves |
+
+**Resultado:** HTML 100% en español, colores reales del cliente, copy basado en industria, NO contenido hardcodeado.
 
 ---
 
@@ -203,6 +229,51 @@ Antes de exponer públicamente:
 3. Habilitar `secure: true` en cookies (requiere HTTPS)
 4. Configurar firewall (solo 22, 80, 443)
 5. Revisar logs de acceso periódicamente
+
+---
+
+## Testing
+
+### Test del Pipeline GrowBy v3.5.0
+
+Ejecutar test completo del pipeline con skills reales:
+
+```bash
+node scripts/test-pipeline.js
+```
+
+Este test:
+1. ✅ Scrapea https://hngabogados.com con quick-scrape
+2. ✅ Ejecuta buildHTML con los 4 agentes (UI, UX, SEO/Copy, Animate)
+3. ✅ Verifica que el HTML contenga:
+   - Nombre de marca real (HNG)
+   - Colores reales del cliente
+   - Idioma español
+   - Responsive design
+   - Animaciones
+   - Accessibility (prefers-reduced-motion)
+4. ✅ Guarda en `outputs/test-hng-[timestamp]/index.html`
+5. ✅ Muestra URLs de prueba (public + private)
+
+**Reporte esperado:**
+```
+✅ RESULTADOS:
+   HTML generado: XX.X KB
+   Contiene "HNG": ✅
+   Contiene brand name: ✅
+   Contiene colores reales: ✅
+   Idioma español: ✅
+   Responsive: ✅
+   Animations: ✅
+   Accessibility: ✅
+
+📋 Skills ejecutados:
+   ✅ firecrawl
+   ✅ page-cro (layout detectado)
+   ✅ copywriting (copy generado)
+   ✅ seo-audit (meta tags)
+   ✅ animate (animaciones)
+```
 
 ---
 

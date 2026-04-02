@@ -195,32 +195,14 @@ async function runPipeline(url, jobId, context = '') {
     emit('scraping', '🔍 Analizando sitio original...', 10);
     const scrapeData = await quickScrape(url);
 
-    // PASO 2: Análisis y Design System basado en datos reales
-    emit('analysis', '🧠 Analizando UI/UX/SEO...', 30);
-
-    // Design system con colores REALES del cliente (no hardcoded)
-    const designSystem = {
-      theme: {
-        customColor: scrapeData.brand?.colors?.primary || '#5D55D7',
-        secondaryColor: scrapeData.brand?.colors?.secondary || '#FFCC00',
-        headlineFont: 'Sora',
-        bodyFont: 'Inter'
-      },
-      brand: {
-        name: scrapeData.brand?.name || url,
-        logo: scrapeData.brand?.logo,
-        industry: scrapeData.business?.industry || 'servicios profesionales'
-      }
-    };
-
-    console.log(`\n🧠 Análisis completado para: ${scrapeData.brand?.name}`);
-    console.log(`   Industria: ${designSystem.brand.industry}`);
-    console.log(`   Color primario: ${designSystem.theme.customColor}`);
+    // PASO 2: Datos extraídos del scraping (el análisis completo lo hace html-builder con skills)
+    console.log(`\n📊 Datos scrapeados para: ${scrapeData.brand?.name || url}`);
+    console.log(`   Industria: ${scrapeData.business?.industry || 'no detectada'}`);
+    console.log(`   Colores: ${scrapeData.brand?.colors?.primary || 'no detectados'}`);
+    console.log(`   Servicios: ${scrapeData.business?.key_services?.length || 0} encontrados`);
     console.log(`   Context: ${context || 'Sin contexto específico'}`);
 
-    // PASO 3: Generar HTML con html-builder (Pipeline GrowBy)
-    emit('design', '🎨 Construyendo HTML optimizado...', 60);
-
+    // PASO 3: Generar HTML con html-builder (Pipeline GrowBy v3.5.0 — usa skills reales)
     const { buildHTML } = await import('../../scripts/agents/html-builder.js');
 
     // Agregar context al scrapeData para que html-builder lo use
@@ -230,7 +212,8 @@ async function runPipeline(url, jobId, context = '') {
       clientObjective: context || 'Rediseño profesional con mejor UX y conversión'
     };
 
-    const html = buildHTML(url, enrichedScrapeData, designSystem);
+    // buildHTML ahora es async y usa 4 agentes con skills reales
+    const html = await buildHTML(url, enrichedScrapeData, jobId, emit);
     const projectId = null; // Pipeline no usa Stitch project ID
 
     // PASO 4: Save HTML
