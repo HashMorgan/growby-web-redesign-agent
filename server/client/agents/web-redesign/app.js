@@ -329,21 +329,14 @@ function handleComplete(data) {
   document.getElementById('progressSection').classList.add('hidden');
   document.getElementById('resultSection').classList.remove('hidden');
 
-  const { netlifyUrl } = data;
+  const { publicUrl, privateUrl } = data;
 
-  // Build shareable URL
-  const isNetlify = netlifyUrl && netlifyUrl.startsWith('https://');
-  const isPreview = netlifyUrl && netlifyUrl.startsWith('/preview/');
-  const shareUrl = isNetlify
-    ? netlifyUrl
-    : isPreview
-      ? window.location.origin + netlifyUrl
-      : netlifyUrl;
+  // Mostrar ambas URLs
+  document.getElementById('publicUrlInput').value = publicUrl || '';
+  document.getElementById('privateUrlInput').value = privateUrl || '';
 
-  const previewSrc = isNetlify || isPreview ? netlifyUrl : null;
-
-  document.getElementById('netlifyUrl').value = shareUrl || '';
-  if (previewSrc) loadPreview(previewSrc);
+  // Cargar preview usando privateUrl (el usuario está autenticado)
+  if (privateUrl) loadPreview(privateUrl);
 
   toastManager.success('✅ Rediseño completado y publicado');
 }
@@ -368,24 +361,40 @@ function loadPreview(url) {
   };
 }
 
-document.getElementById('copyUrlBtn').addEventListener('click', async () => {
-  const url = document.getElementById('netlifyUrl').value;
+document.getElementById('copyPublicUrlBtn').addEventListener('click', async () => {
+  const url = document.getElementById('publicUrlInput').value;
   if (!url) {
     toastManager.error('URL no disponible');
     return;
   }
   try {
     await navigator.clipboard.writeText(url);
-    toastManager.success('URL copiada al portapapeles', 2000);
+    toastManager.success('Link del cliente copiado ✅', 2000);
   } catch (_) {
-    document.getElementById('netlifyUrl').select();
+    document.getElementById('publicUrlInput').select();
     document.execCommand('copy');
-    toastManager.success('URL copiada', 2000);
+    toastManager.success('Link copiado', 2000);
+  }
+});
+
+document.getElementById('copyPrivateUrlBtn').addEventListener('click', async () => {
+  const url = document.getElementById('privateUrlInput').value;
+  if (!url) {
+    toastManager.error('URL no disponible');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    toastManager.success('Link privado copiado', 2000);
+  } catch (_) {
+    document.getElementById('privateUrlInput').select();
+    document.execCommand('copy');
+    toastManager.success('Link copiado', 2000);
   }
 });
 
 document.getElementById('openTabBtn').addEventListener('click', () => {
-  const url = document.getElementById('netlifyUrl').value;
+  const url = document.getElementById('privateUrlInput').value;
   if (!url) {
     toastManager.error('URL no disponible');
     return;

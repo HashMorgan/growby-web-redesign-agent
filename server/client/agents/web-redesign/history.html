@@ -297,35 +297,34 @@
         redesigns.forEach((r, i) => {
           const card = grid.children[i];
 
+          // Ver privado (usa privateUrl con requireAuth)
           card.querySelector('.view-btn')?.addEventListener('click', () => {
-            if (r.netlifyUrl) {
-              window.open(r.netlifyUrl, '_blank', 'noopener,noreferrer');
+            if (r.privateUrl) {
+              window.open(r.privateUrl, '_blank', 'noopener,noreferrer');
             } else {
               toast.error('URL no disponible');
             }
           });
 
-          card.querySelector('.copy-btn')?.addEventListener('click', async () => {
-            if (!r.netlifyUrl) {
-              toast.error('URL no disponible');
+          // Compartir público (copia publicUrl)
+          card.querySelector('.share-btn')?.addEventListener('click', async () => {
+            if (!r.publicUrl) {
+              toast.error('URL pública no disponible');
               return;
             }
-            const fullUrl = r.netlifyUrl.startsWith('http')
-              ? r.netlifyUrl
-              : window.location.origin + r.netlifyUrl;
             try {
-              await navigator.clipboard.writeText(fullUrl);
-              toast.success('URL copiada', 2000);
+              await navigator.clipboard.writeText(r.publicUrl);
+              toast.success('Link del cliente copiado ✅', 2000);
             } catch (_) {
               toast.error('Error al copiar');
             }
           });
         });
 
-        // Check active status (async)
+        // Check active status (async) - all local URLs are always active
         redesigns.forEach((r, i) => {
-          if (r.netlifyUrl && r.netlifyUrl.startsWith('http')) {
-            checkUrlStatus(r.netlifyUrl, i);
+          if (r.privateUrl) {
+            updateStatusBadge(i, true);
           }
         });
 
@@ -401,10 +400,10 @@
 
           <div class="flex gap-2">
             <button class="view-btn flex-1 px-4 py-2 bg-[#5D55D7] hover:bg-[#4a44b0] rounded-lg text-white font-medium transition text-sm">
-              Ver rediseño
+              🔒 Ver (privado)
             </button>
-            <button class="copy-btn px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300 font-medium transition text-sm">
-              📋
+            <button class="share-btn px-4 py-2 bg-[#FFCC00] hover:bg-[#e6b800] rounded-lg text-gray-900 font-semibold transition text-sm">
+              🌐 Compartir
             </button>
           </div>
         </div>

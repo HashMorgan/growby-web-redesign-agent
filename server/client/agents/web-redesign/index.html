@@ -187,29 +187,60 @@
         <div class="bg-gray-900 rounded-2xl p-6 sm:p-8">
           <h3 class="text-2xl sm:text-3xl font-bold mb-6 text-center">✅ Rediseño completado</h3>
 
-          <!-- URL y acciones -->
-          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
-            <input
-              id="netlifyUrl"
-              type="text"
-              readonly
-              class="flex-1 px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm"
-              style="font-size: 14px; min-height: 44px;"
-            />
-            <button
-              id="copyUrlBtn"
-              class="px-6 py-3 bg-[#5D55D7] hover:bg-[#4a44b0] rounded-lg transition text-white font-medium whitespace-nowrap"
-              style="min-height: 44px;"
-            >
-              📋 Copiar URL
-            </button>
-            <button
-              id="openTabBtn"
-              class="px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-lg transition whitespace-nowrap"
-              style="min-height: 44px;"
-            >
-              🔗 Ver resultado
-            </button>
+          <!-- URLs y acciones -->
+          <div class="space-y-4 mb-6">
+            <!-- URL PÚBLICA para clientes -->
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-2">
+                🌐 Link para compartir con el cliente (público, sin login)
+              </label>
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <input
+                  id="publicUrlInput"
+                  type="text"
+                  readonly
+                  class="flex-1 px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm"
+                  style="font-size: 14px; min-height: 44px;"
+                />
+                <button
+                  id="copyPublicUrlBtn"
+                  class="px-6 py-3 bg-[#FFCC00] hover:bg-[#e6b800] rounded-lg transition text-gray-900 font-semibold whitespace-nowrap"
+                  style="min-height: 44px;"
+                >
+                  📋 Copiar link del cliente
+                </button>
+              </div>
+            </div>
+
+            <!-- URL PRIVADA para equipo -->
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-2">
+                🔒 Link privado (requiere login)
+              </label>
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <input
+                  id="privateUrlInput"
+                  type="text"
+                  readonly
+                  class="flex-1 px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm"
+                  style="font-size: 14px; min-height: 44px;"
+                />
+                <button
+                  id="copyPrivateUrlBtn"
+                  class="px-6 py-3 bg-[#5D55D7] hover:bg-[#4a44b0] rounded-lg transition text-white font-medium whitespace-nowrap"
+                  style="min-height: 44px;"
+                >
+                  📋 Copiar
+                </button>
+                <button
+                  id="openTabBtn"
+                  class="px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-lg transition whitespace-nowrap"
+                  style="min-height: 44px;"
+                >
+                  🔗 Abrir
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- Preview iframe -->

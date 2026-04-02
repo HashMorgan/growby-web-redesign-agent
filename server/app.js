@@ -136,8 +136,12 @@ app.get('/api/health', (req, res) =>
   }),
 );
 
-// ── Preview route — serves generated redesigns (auth-protected) ──────────────
-app.use('/preview', requireAuth, express.static(path.join(__dirname, '../outputs')));
+// ── Redesign routes — dual URLs for team and clients ─────────────────────────
+// PÚBLICA — para compartir con clientes (sin login, jobId largo actúa como token)
+app.use('/demo', express.static(path.join(__dirname, '../outputs')));
+
+// PRIVADA — solo equipo GrowBy logueado
+app.use('/redesigns', requireAuth, express.static(path.join(__dirname, '../outputs')));
 
 // ── Static assets (css, js, images) — after auth routes ──────────────────────
 app.use(express.static(path.join(__dirname, 'client')));
