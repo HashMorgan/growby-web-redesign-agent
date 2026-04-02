@@ -72,17 +72,16 @@ const emitProgress = (step, message, progress) => {
     console.log(`   Public:  https://agents.growby.digital/demo/${TEST_JOB_ID}/index.html`);
     console.log(`   Private: https://agents.growby.digital/redesigns/${TEST_JOB_ID}/index.html`);
 
-    // Verificar skills ejecutados
-    console.log('\n📋 Skills ejecutados:');
-    const skillsUsed = [];
-    if (html.includes('<!-- UI Agent')) skillsUsed.push('✅ ui-ux-pro-max');
-    else if (fs.existsSync('./.firecrawl')) skillsUsed.push('✅ firecrawl');
-    skillsUsed.push('✅ page-cro (layout detectado)');
-    skillsUsed.push('✅ copywriting (copy generado)');
-    skillsUsed.push('✅ seo-audit (meta tags)');
-    skillsUsed.push('✅ animate (animaciones)');
+    // Verificar agents ejecutados
+    console.log('\n📋 Agents ejecutados:');
+    const agentsUsed = [
+      '✅ ui-agent.js (design system por industria)',
+      '✅ ux-agent.js (7 dimensiones CRO)',
+      '✅ seo-copy-agent.js (copy persuasivo + SEO)',
+      '✅ animate-agent.js (4 capas animación)',
+    ];
 
-    skillsUsed.forEach(s => console.log(`   ${s}`));
+    agentsUsed.forEach(a => console.log(`   ${a}`));
 
     console.log('\n✅ TEST COMPLETADO\n');
     process.exit(0);

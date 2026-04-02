@@ -81,7 +81,7 @@ MEMORIA — Feedback loop continuo
 
 ### Skills del Pipeline GrowBy (v3.5.0)
 
-Pipeline GrowBy ahora usa 5 skills profesionales en su análisis:
+Pipeline GrowBy usa 4 agentes JavaScript que implementan los principios de 5 skills profesionales:
 
 | Skill | Propósito | Output |
 |-------|-----------|--------|
@@ -93,6 +93,24 @@ Pipeline GrowBy ahora usa 5 skills profesionales en su análisis:
 | **animate** | Estrategia de animaciones en 4 capas (hero, feedback, transitions, delight) | Animaciones, timings, easing curves |
 
 **Resultado:** HTML 100% en español, colores reales del cliente, copy basado en industria, NO contenido hardcodeado.
+
+### Agents del Pipeline (Implementación)
+
+El Pipeline ejecuta 4 agentes JavaScript que implementan los principios de los skills:
+
+| Agent | Archivo | Basado en | Qué genera |
+|-------|---------|-----------|------------|
+| **UI Agent** | `scripts/agents/ui-agent.js` | ui-ux-pro-max | Design systems por industria (8 industrias + fallback). Paletas profesionales, tipografías modernas, spacing, shadows. Combina defaults con colores REALES del scraping. |
+| **UX Agent** | `scripts/agents/ux-agent.js` | page-cro | Análisis de 7 dimensiones CRO: value prop clarity, headlines, CTAs, visual hierarchy, trust signals, objection handling, friction points. Genera quick wins + layout recommendations. |
+| **SEO/Copy Agent** | `scripts/agents/seo-copy-agent.js` | copywriting + seo-audit | Copy templates por industria (8 industrias). Genera H1 outcome-focused, subheadlines, CTAs value-driven, meta title (50-60 chars), meta description (150-160 chars). Audita SEO actual. |
+| **Animate Agent** | `scripts/agents/animate-agent.js` | animate | Estrategia de 4 capas: hero moment (fade-slide-up 600ms), feedback (hover/click), transitions (scroll-reveal), delight (counter animations). Timings + easing curves + prefers-reduced-motion. |
+
+**Cómo funciona:**
+1. `html-builder.js` **importa** los 4 agentes
+2. Ejecuta cada agente pasándole `scrapeData`
+3. Cada agente **retorna un objeto JavaScript** con configuraciones
+4. `html-builder.js` usa esos outputs para construir el HTML
+5. **NO se parsean archivos SKILL.md en runtime** — los principios están implementados en código JavaScript
 
 ---
 
@@ -267,12 +285,11 @@ Este test:
    Animations: ✅
    Accessibility: ✅
 
-📋 Skills ejecutados:
-   ✅ firecrawl
-   ✅ page-cro (layout detectado)
-   ✅ copywriting (copy generado)
-   ✅ seo-audit (meta tags)
-   ✅ animate (animaciones)
+📋 Agents ejecutados:
+   ✅ ui-agent.js (design system por industria)
+   ✅ ux-agent.js (7 dimensiones CRO)
+   ✅ seo-copy-agent.js (copy persuasivo + SEO)
+   ✅ animate-agent.js (4 capas animación)
 ```
 
 ---
