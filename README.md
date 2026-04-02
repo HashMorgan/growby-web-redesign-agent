@@ -1,51 +1,72 @@
 # GrowBy Web Redesign Agent
 
 ![Status](https://img.shields.io/badge/status-Production-green)
-![Version](https://img.shields.io/badge/version-v1.0.0-blue)
-![Stack](https://img.shields.io/badge/stack-Stitch%20MCP%20%2B%20Claude%20Code%20%2B%20React%20%2B%20Tailwind-purple)
+![Version](https://img.shields.io/badge/version-v3.2.0-blue)
+![Stack](https://img.shields.io/badge/stack-Stitch%20AI%20%2B%20Express%20%2B%20WebSocket%20%2B%20React%20%2B%20Tailwind-purple)
 
 Agente de IA especializado en rediseño web automático. Recibe la URL del home de un prospecto y genera, en una sola sesión, un rediseño completo de UI + UX + SEO + Visual como artifact React compartible — listo para presentar al cliente o entregar al equipo de desarrollo.
 
 ---
 
-## Arquitectura v1.0.0 — Stitch MCP + Multi-Subagent Pipeline
+## Arquitectura v3.2.0 — Plataforma Web Multi-Agente
+
+**URL producción:** https://agents.growby.digital
+
+### Interfaz Web (3-step flow)
 
 ```
-FASE 1 — SCRAPING (deep multi-página)
-  scraper-pro.js → Firecrawl crawl (hasta 15 páginas)
-  Fallback: Firecrawl scrape (single) → fallback nativo
-  → memory/working/scraping-deep-[timestamp].json
+PASO 1 — Selección de método
+  🎨 Stitch AI      → Google Gemini 3 Flash (creativo, rápido)
+  ⚡ Pipeline GrowBy → Análisis profundo + templates (SEO, CRO)
 
-FASE 2 — ANÁLISIS (4 subagentes paralelos con token slicing)
-  UI Agent      → design system por industria (ui-ux-pro-max)
-  UX Agent      → 7 dimensiones CRO + quick wins (page-cro)
-  SEO/Copy Agent → auditoría + copy reescrito (seo-audit + copywriting)
-  Visual Agent  → prompts Gemini API optimizados por industria
-  → outputs/[cliente]-[fecha]/analysis.json (70% menos tokens)
+PASO 2 — Input del usuario
+  URL del sitio + Objetivo del rediseño (contexto)
+  Validación en tiempo real
 
-FASE 3 — LAYOUT PLANNING
-  layout-architect.js → plan de secciones + design system
-  → outputs/[cliente]-[fecha]/layout-plan.json
+PASO 3 — Progreso en tiempo real (WebSocket)
+  → Generación de HTML completo
+  → Preview iframe + dual URLs instantáneas
+```
 
-FASE 3.5 — STITCH AI GENERATION (con fallback)
-  ✨ PRIMARIO: Stitch MCP (Google Gemini 3 Flash)
-     brief-generator.js → prompt optimizado (max 500 chars)
-     stitch-generator.js → generación con timeout 30s
-     → outputs/[cliente]-[fecha]/stitch-output.html
+### Pipeline de generación
+
+```
+FASE 1 — SCRAPING
+  quick-scrape.js → Fetch nativo (title, metas, keywords)
   
-  🔄 FALLBACK: Component-Builder Pipeline
-     component-builder.js → componentes template-based
-     assembler.js → HTML final con anti-contamination check
-     → outputs/[cliente]-[fecha]/index.html
+FASE 2 — GENERACIÓN (según método elegido)
+  
+  🎨 STITCH AI:
+     stitch-simple.js → Stitch SDK (Google Gemini 3 Flash)
+     → outputs/[jobId]/index.html
+  
+  ⚡ PIPELINE GROWBY:
+     html-builder.js → Templates React + Tailwind
+     → outputs/[jobId]/index.html
 
-FASE 6 — DEPLOY A NETLIFY
-  deploy-netlify.sh → publica automáticamente
-  → URL pública compartible
+FASE 3 — PUBLICACIÓN (self-hosted, 0 segundos)
+  ✅ URL PÚBLICA  — /demo/[jobId]/index.html (sin auth, para clientes)
+  ✅ URL PRIVADA  — /redesigns/[jobId]/index.html (requireAuth, para equipo)
+  
+  Ventajas vs Netlify:
+  • URLs instantáneas (0s vs 30-60s)
+  • Sin límites de deploys
+  • Control total en Droplet propio
+  • Seguridad por oscuridad (jobId largo)
 
 MEMORIA — Feedback loop continuo
   → memory/episodic/[cliente]-[fecha].json
   → memory/semantic-patterns.json (aprendizaje por industria)
 ```
+
+### Stack tecnológico
+
+- **Backend:** Express.js + WebSocket (ws)
+- **Frontend:** Vanilla JS + Tailwind CDN
+- **Auth:** bcrypt + express-session + SQLite
+- **Design:** Stitch AI SDK / HTML builder templates
+- **Deploy:** PM2 + DigitalOcean Droplet + Nginx
+- **Hosting:** Self-hosted dual URLs (/demo público + /redesigns privado)
 
 ---
 
@@ -68,15 +89,28 @@ bash scripts/skills.sh
 
 ## Uso
 
-Desde Claude Code, escribe:
+### Desde la plataforma web (recomendado)
+
+1. Accede a https://agents.growby.digital
+2. Login con credenciales del equipo GrowBy
+3. Click en "Web Redesign Agent"
+4. Elige método: **Stitch AI** (rápido) o **Pipeline GrowBy** (analítico)
+5. Ingresa URL + objetivo del rediseño
+6. Observa progreso en tiempo real via WebSocket
+7. Al completar, obtienes:
+   - **Link del cliente** (público, sin login) → /demo/
+   - **Link privado** (requiere auth) → /redesigns/
+   - Preview iframe + botón descargar HTML
+
+### Desde Claude Code (programático)
+
+Escribe:
 
 ```
 Ejecuta el Web Redesign Agent sobre: https://url-del-prospecto.com
 ```
 
-El agente confirmará la URL y pedirá autorización antes de iniciar requests externos. Al finalizar entrega:
-- Artifact React renderizable directamente en Claude.ai
-- ZIP con redesign.jsx + analysis.json listo para el dev
+El agente confirmará la URL y pedirá autorización antes de iniciar requests externos.
 
 ---
 
@@ -96,14 +130,22 @@ El agente confirmará la URL y pedirá autorización antes de iniciar requests e
 
 ---
 
-## Scripts de utilidad
+## Desarrollo local
 
 ```bash
-# Comparar métodos de scraping sobre una URL
-bash scripts/evaluate-scraping.sh https://url-del-prospecto.com
+# Iniciar servidor en modo desarrollo
+cd server
+node app.js
 
-# Empaquetar output para entregar al dev
-bash scripts/export-for-dev.sh outputs/cliente-2026-04-01/
+# El servidor escucha en http://localhost:3001
+# Dashboard: http://localhost:3001/
+# Web Redesign: http://localhost:3001/web-redesign
+
+# Cambiar contraseña del usuario
+node scripts/change-password.js
+
+# Tests de seguridad
+node scripts/security-tests.js
 ```
 
 ---
