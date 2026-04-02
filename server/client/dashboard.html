@@ -401,6 +401,98 @@
 
     footer a { color: rgba(93,85,215,0.7); text-decoration: none; }
     footer a:hover { color: var(--purple); }
+
+    /* ── RESPONSIVE ─────────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .header-inner {
+        padding: 0 16px;
+        height: 56px;
+      }
+
+      .logo-name {
+        font-size: 0.95rem;
+      }
+
+      .header-right {
+        gap: 8px;
+      }
+
+      .user-badge {
+        font-size: 0.75rem;
+      }
+
+      .btn-logout {
+        font-size: 0.75rem;
+        padding: 4px 8px;
+      }
+
+      .hero {
+        padding: 48px 16px 32px;
+      }
+
+      .hero-tag {
+        font-size: 0.7rem;
+        padding: 4px 12px;
+      }
+
+      .hero h1 {
+        font-size: clamp(1.75rem, 8vw, 2.25rem);
+      }
+
+      .hero p {
+        font-size: 0.95rem;
+        margin-bottom: 32px;
+      }
+
+      .stats-bar {
+        gap: 20px;
+      }
+
+      .stat-value {
+        font-size: 1.5rem;
+      }
+
+      .stat-label {
+        font-size: 0.7rem;
+      }
+
+      .stat-divider {
+        height: 30px;
+      }
+
+      .agents-section {
+        padding: 0 16px 60px;
+      }
+
+      .agents-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+
+      .agent-card {
+        padding: 20px;
+      }
+
+      .card-title {
+        font-size: 1rem;
+      }
+
+      .card-desc {
+        font-size: 0.85rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .stats-bar {
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .stat-divider {
+        width: 100%;
+        height: 1px;
+      }
+    }
   </style>
 </head>
 <body>
