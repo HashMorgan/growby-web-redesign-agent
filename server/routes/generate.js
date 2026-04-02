@@ -55,18 +55,57 @@ async function runStitchPipeline(url, context, jobId) {
   };
 
   try {
-    // PASO 1: Quick Scrape (básico)
+    // PASO 1: Deep Scraping — extraer datos reales del sitio
     emit('analyzing', '🔍 Analizando sitio original...', 10);
     const scrapeData = await quickScrape(url);
 
-    // PASO 2: Build Prompt with context
+    // PASO 2: Build Rich Prompt con datos reales del scraping
     emit('analyzing', '📝 Construyendo prompt para Stitch...', 20);
-    const basePrompt = `Rediseña el home web de ${url}. Usa el mismo contenido, colores y logos del sitio original. Mejora las imágenes según el rubro. Agrega en el footer: Powered by GrowBy con logo https://growby.tech/favicon.ico linking a growby.tech`;
-    const fullPrompt = context
-      ? `${basePrompt}\n\nObjetivo adicional del rediseño:\n${context}`
-      : basePrompt;
 
-    console.log(`\n📝 Stitch Prompt:\n${fullPrompt}\n`);
+    const brandName = scrapeData.brand?.name || url;
+    const industry = scrapeData.business?.industry || 'servicios profesionales';
+    const primaryColor = scrapeData.brand?.colors?.primary || '#5D55D7';
+    const secondaryColor = scrapeData.brand?.colors?.secondary || '#FFCC00';
+    const services = scrapeData.business?.key_services || [];
+    const valueProposition = scrapeData.business?.value_proposition || scrapeData.description || '';
+
+    // Construir prompt estructurado en ESPAÑOL
+    const fullPrompt = `Diseña en ESPAÑOL una landing page profesional moderna para ${brandName}.
+
+DATOS DE LA EMPRESA:
+- Industria: ${industry}
+- Colores de marca: ${primaryColor} (primario), ${secondaryColor} (secundario)
+${services.length > 0 ? `- Servicios clave: ${services.slice(0, 5).join(', ')}` : ''}
+${valueProposition ? `- Propuesta de valor: ${valueProposition}` : ''}
+
+OBJETIVO DEL REDISEÑO:
+${context || 'Modernizar el diseño web con mejor UX y conversión'}
+
+REQUISITOS DE DISEÑO:
+- Idioma: ESPAÑOL (todo el contenido debe estar en español)
+- Estilo: Profesional, no minimalista. Fondos con profundidad y textura.
+- Tipografías: Google Fonts modernas (Plus Jakarta Sans, Outfit, Sora, Inter)
+- Paleta: Usar los colores de marca como base, agregar tonos complementarios
+- Layout: 9 secciones mínimo
+
+ESTRUCTURA REQUERIDA:
+1. Hero con imagen impactante + headline poderoso + CTA principal
+2. Trust signals (logos de clientes, certificaciones, o métricas)
+3. Servicios/Productos con iconos custom y descripciones
+4. Proceso (cómo funciona en 3-4 pasos)
+5. Equipo o valores
+6. Testimonios reales con fotos
+7. CTA con fondo oscuro y contraste alto
+8. FAQ (preguntas frecuentes)
+9. Footer completo con "Powered by GrowBy" (logo: https://growby.tech/favicon.ico linking a growby.tech)
+
+IMPORTANTE:
+- Usar imágenes profesionales de alta calidad
+- Copy persuasivo orientado a conversión
+- Mobile-first responsive
+- Calls-to-action claros en cada sección`;
+
+    console.log(`\n📝 Stitch Prompt (${industry}):\n${fullPrompt.substring(0, 300)}...\n`);
 
     // PASO 3: Generate with Stitch
     emit('generating', '🎨 Generando con Stitch AI...', 30);
@@ -152,27 +191,34 @@ async function runPipeline(url, jobId, context = '') {
   };
 
   try {
-    // PASO 1: Quick Scrape
+    // PASO 1: Deep Scraping — extraer datos reales
     emit('scraping', '🔍 Analizando sitio original...', 10);
     const scrapeData = await quickScrape(url);
 
-    // PASO 2: Análisis (Pipeline propio - sin Stitch)
+    // PASO 2: Análisis y Design System basado en datos reales
     emit('analysis', '🧠 Analizando UI/UX/SEO...', 30);
 
-    // TODO: Aquí se podrían integrar skills si existieran
-    // Por ahora usamos un design system básico optimizado
+    // Design system con colores REALES del cliente (no hardcoded)
     const designSystem = {
       theme: {
-        customColor: '#5D55D7', // GrowBy primary
-        headlineFont: 'Inter',
+        customColor: scrapeData.brand?.colors?.primary || '#5D55D7',
+        secondaryColor: scrapeData.brand?.colors?.secondary || '#FFCC00',
+        headlineFont: 'Sora',
         bodyFont: 'Inter'
+      },
+      brand: {
+        name: scrapeData.brand?.name || url,
+        logo: scrapeData.brand?.logo,
+        industry: scrapeData.business?.industry || 'servicios profesionales'
       }
     };
 
-    console.log(`\n🧠 Análisis completado para: ${url}`);
+    console.log(`\n🧠 Análisis completado para: ${scrapeData.brand?.name}`);
+    console.log(`   Industria: ${designSystem.brand.industry}`);
+    console.log(`   Color primario: ${designSystem.theme.customColor}`);
     console.log(`   Context: ${context || 'Sin contexto específico'}`);
 
-    // PASO 3: Generar HTML con html-builder (NO Stitch)
+    // PASO 3: Generar HTML con html-builder (Pipeline GrowBy)
     emit('design', '🎨 Construyendo HTML optimizado...', 60);
 
     const { buildHTML } = await import('../../scripts/agents/html-builder.js');

@@ -21,24 +21,32 @@ export function buildHTML(url, scrapeData, designSystem = null) {
   const description = scrapeData.description || 'Mejoramos tu presencia digital';
   const context = scrapeData.context || scrapeData.clientObjective || '';
 
-  // Extract domain for branding
-  const domain = url.replace(/https?:\/\/(www\.)?/, '').split('/')[0];
+  // Datos REALES del scraping
+  const brandName = scrapeData.brand?.name || designSystem?.brand?.name || url.replace(/https?:\/\/(www\.)?/, '').split('/')[0];
+  const industry = scrapeData.business?.industry || designSystem?.brand?.industry || 'servicios profesionales';
+  const realServices = scrapeData.business?.key_services || [];
+  const valueProposition = scrapeData.business?.value_proposition || description;
+  const logoUrl = scrapeData.brand?.logo;
 
-  // Colores: usar del sitio original si están disponibles, sino GrowBy
-  const primaryColor = designSystem?.theme?.customColor || '#5D55D7';
+  // Colores REALES del cliente
+  const primaryColor = scrapeData.brand?.colors?.primary || designSystem?.theme?.customColor || '#5D55D7';
+  const secondaryColor = scrapeData.brand?.colors?.secondary || designSystem?.theme?.secondaryColor || '#FFCC00';
   const headlineFont = designSystem?.theme?.headlineFont || 'Sora';
   const bodyFont = designSystem?.theme?.bodyFont || 'Inter';
 
-  // Generar copy adaptado al context
-  const heroTitle = context.includes('modernizar') || context.includes('cambio total')
-    ? `${title.split(' - ')[0]}: Nueva Era Digital`
-    : context.includes('conversión') || context.includes('ventas')
-    ? `Impulsa tus Resultados con ${domain}`
-    : `${title.split(' - ')[0]}: Rediseño Profesional`;
+  console.log(`\n🎨 Building HTML for: ${brandName}`);
+  console.log(`   Industry: ${industry}`);
+  console.log(`   Primary: ${primaryColor}`);
+  console.log(`   Services: ${realServices.slice(0, 3).join(', ')}`);
 
-  const heroSubtitle = context
-    ? context.length > 150 ? context.slice(0, 150) + '...' : context
-    : description;
+  // Generar copy adaptado al context y datos reales
+  const heroTitle = context.includes('modernizar') || context.includes('cambio total')
+    ? `${brandName}: Nueva Era Digital`
+    : context.includes('conversión') || context.includes('ventas')
+    ? `Impulsa tus Resultados con ${brandName}`
+    : `${brandName}: ${title.split(' - ')[0] || 'Excelencia Profesional'}`;
+
+  const heroSubtitle = valueProposition || (context.length > 150 ? context.slice(0, 150) + '...' : context) || description;
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -97,10 +105,17 @@ export function buildHTML(url, scrapeData, designSystem = null) {
     <div class="max-w-7xl mx-auto px-4 sm:px-6">
       <div class="flex justify-between items-center h-16">
         <div class="flex items-center gap-2">
-          <div class="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white" style="background: ${primaryColor}">
-            ${domain.charAt(0).toUpperCase()}
-          </div>
-          <span class="font-semibold text-lg">${domain}</span>
+          ${logoUrl ? `
+            <img src="${logoUrl}" alt="${brandName}" class="h-10 w-auto object-contain" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+            <div class="w-10 h-10 rounded-lg hidden items-center justify-center font-bold text-white" style="background: ${primaryColor}">
+              ${brandName.charAt(0).toUpperCase()}
+            </div>
+          ` : `
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white" style="background: ${primaryColor}">
+              ${brandName.charAt(0).toUpperCase()}
+            </div>
+          `}
+          <span class="font-semibold text-lg">${brandName}</span>
         </div>
         <div class="hidden md:flex gap-8 text-sm font-medium">
           <a href="#inicio" class="hover:opacity-70 transition">Inicio</a>
@@ -121,8 +136,8 @@ export function buildHTML(url, scrapeData, designSystem = null) {
       <div class="grid lg:grid-cols-2 gap-12 items-center">
         <!-- Left: Content -->
         <div class="fade-in-up">
-          <div class="inline-block px-4 py-2 bg-${primaryColor.replace('#', '')}/10 rounded-full text-sm font-semibold mb-6" style="color: ${primaryColor}">
-            ✨ Rediseño Profesional
+          <div class="inline-block px-4 py-2 rounded-full text-sm font-semibold mb-6" style="background: ${primaryColor}15; color: ${primaryColor}">
+            ✨ ${industry.charAt(0).toUpperCase() + industry.slice(1)}
           </div>
           <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-6" style="color: #111827">
             ${escapeHtml(heroTitle)}
@@ -195,7 +210,7 @@ export function buildHTML(url, scrapeData, designSystem = null) {
       </div>
 
       <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-        ${generateServiceCards(primaryColor)}
+        ${generateServiceCards(primaryColor, realServices, industry)}
       </div>
     </div>
   </section>
@@ -265,7 +280,7 @@ export function buildHTML(url, scrapeData, designSystem = null) {
           </a>
         </div>
         <div class="text-sm text-gray-400">
-          © ${new Date().getFullYear()} ${domain} · Rediseño generado con IA
+          © ${new Date().getFullYear()} ${brandName} · Rediseño generado con IA
         </div>
         <div class="flex gap-6 text-sm">
           <a href="#" class="hover:text-white transition">Privacidad</a>
@@ -280,13 +295,24 @@ export function buildHTML(url, scrapeData, designSystem = null) {
 </html>`;
 }
 
-function generateServiceCards(primaryColor) {
-  const services = [
-    { icon: '🎨', title: 'Diseño UI/UX', desc: 'Interfaces modernas y experiencias intuitivas' },
-    { icon: '📱', title: 'Responsive Design', desc: 'Perfecto en todos los dispositivos' },
-    { icon: '⚡', title: 'Performance', desc: 'Carga ultra rápida optimizada' },
-    { icon: '🔍', title: 'SEO Optimizado', desc: 'Mejor posicionamiento en Google' }
-  ];
+function generateServiceCards(primaryColor, realServices = [], industry = '') {
+  // Si hay servicios reales del scraping, usarlos (max 4)
+  let services;
+  if (realServices.length >= 3) {
+    services = realServices.slice(0, 4).map((svc, i) => ({
+      icon: ['🎯', '⚡', '🚀', '💡'][i],
+      title: svc.length > 40 ? svc.slice(0, 40) + '...' : svc,
+      desc: `Servicio especializado de ${industry}`
+    }));
+  } else {
+    // Fallback a servicios genéricos
+    services = [
+      { icon: '🎨', title: 'Diseño UI/UX', desc: 'Interfaces modernas y experiencias intuitivas' },
+      { icon: '📱', title: 'Responsive Design', desc: 'Perfecto en todos los dispositivos' },
+      { icon: '⚡', title: 'Performance', desc: 'Carga ultra rápida optimizada' },
+      { icon: '🔍', title: 'SEO Optimizado', desc: 'Mejor posicionamiento en Google' }
+    ];
+  }
 
   return services.map(s => `
     <div class="bg-white p-8 rounded-xl shadow-md card-hover">
