@@ -93,6 +93,9 @@ app.get('/', requireAuth, (req, res) =>
 app.get('/web-redesign', requireAuth, (req, res) =>
   res.sendFile('agents/web-redesign/index.html', { root: path.join(__dirname, 'client') }),
 );
+app.get('/web-redesign/history', requireAuth, (req, res) =>
+  res.sendFile('agents/web-redesign/history.html', { root: path.join(__dirname, 'client') }),
+);
 
 // ── HTTP server + WebSocket ───────────────────────────────────────────────────
 const server = http.createServer(app);
@@ -118,6 +121,7 @@ wss.on('connection', (ws) => {
 import generateRoute from './routes/generate.js';
 
 app.use('/web-redesign/api/generate', requireAuth, generateRoute);
+app.use('/web-redesign/api', requireAuth, generateRoute); // For /stats and /history
 
 // ── Health check (public — infra monitoring) ─────────────────────────────────
 app.get('/api/health', (req, res) =>

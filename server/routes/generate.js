@@ -296,6 +296,71 @@ router.get('/stats', (req, res) => {
   }
 });
 
+// GET /history — list all generated redesigns
+router.get('/history', (req, res) => {
+  try {
+    const outputsDir = path.join(PROJECT_ROOT, 'outputs');
+    if (!fs.existsSync(outputsDir)) {
+      return res.json({ redesigns: [] });
+    }
+
+    const entries = fs.readdirSync(outputsDir, { withFileTypes: true })
+      .filter(e => e.isDirectory())
+      .map(dir => {
+        const jobId = dir.name;
+        const dirPath = path.join(outputsDir, jobId);
+
+        // Try to read metadata
+        let metadata = null;
+        const stitchMetaPath = path.join(dirPath, 'stitch-meta.json');
+        const analysisPath = path.join(dirPath, 'analysis.json');
+
+        if (fs.existsSync(stitchMetaPath)) {
+          metadata = JSON.parse(fs.readFileSync(stitchMetaPath, 'utf8'));
+        } else if (fs.existsSync(analysisPath)) {
+          const analysis = JSON.parse(fs.readFileSync(analysisPath, 'utf8'));
+          metadata = {
+            url: analysis.url || '',
+            method: 'pipeline',
+            timestamp: analysis.timestamp || new Date().toISOString()
+          };
+        }
+
+        // Try to get Netlify URL
+        let netlifyUrl = null;
+        const indexPath = path.join(dirPath, 'index.html');
+        if (fs.existsSync(indexPath)) {
+          // Check if there's a deployed URL
+          if (metadata?.siteName) {
+            netlifyUrl = `https://${metadata.siteName}.netlify.app`;
+          } else {
+            // Fallback to preview
+            netlifyUrl = `/preview/${jobId}/index.html`;
+          }
+        }
+
+        // Get file stats for creation time
+        const stats = fs.statSync(dirPath);
+
+        return {
+          jobId,
+          url: metadata?.url || '',
+          method: metadata?.method || 'unknown',
+          context: metadata?.context || '',
+          netlifyUrl,
+          timestamp: metadata?.timestamp || stats.birthtime.toISOString(),
+          createdAt: stats.birthtime.toISOString()
+        };
+      })
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)); // Most recent first
+
+    res.json({ redesigns: entries });
+  } catch (error) {
+    console.error('Error reading history:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // POST / — start redesign job
 router.post('/', async (req, res) => {
   const { url, method = 'stitch', context = '' } = req.body;
